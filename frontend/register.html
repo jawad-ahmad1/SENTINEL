@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Register</title>
+  <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css?v=7">
+</head>
+
+<body>
+  <!-- Layout Containers -->
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div id="header-container"></div>
+
+    <div class="card animate-enter" style="max-width: 800px;">
+      <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+
+        <!-- RFID (Full Width) -->
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>RFID UID</label>
+          <div class="rfid-input-group">
+            <input type="text" id="rfid" placeholder="Scan card or type UID" autofocus />
+            <button class="btn btn-outline" id="scanBtn">Tap to Scan</button>
+          </div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="name" placeholder="e.g. John Doe" />
+        </div>
+        <div class="form-group">
+          <label>Email (Optional)</label>
+          <input type="text" id="email" placeholder="john@company.com" />
+        </div>
+
+        <!-- Row 2 -->
+        <div class="form-group">
+          <label>Department</label>
+          <input type="text" id="department" placeholder="Engineering" />
+        </div>
+        <div class="form-group">
+          <label>Position</label>
+          <input type="text" id="position" placeholder="Developer" />
+        </div>
+
+        <!-- Row 3 -->
+        <div class="form-group">
+          <label>Phone (Optional)</label>
+          <input type="text" id="phone" placeholder="+1 555-0123" />
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="register" style="width:100%; margin-top: 32px;">Register Employee</button>
+
+      <div id="messageArea"></div>
+
+      <div class="status-bar">
+        <div>Total Employees: <span class="status-val" id="statEmployees">—</span></div>
+        <div>Today's Scans: <span class="status-val" id="statScans">—</span></div>
+        <div>Status: <span class="status-val" id="status">Ready</span></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script src="js/layout.js?v=7"></script>
+  <script>
+    Layout.init({
+      active: 'register',
+      title: 'Register Employee',
+      subtitle: 'Pair a new RFID card with an employee profile'
+    });
+
+    const API_BASE = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';
+
+    // Server-side admin guard
+    (async () => {
+      const user = await AUTH.requireAdmin();
+      if (!user) return;
+      AUTH.initInactivityTimeout();
+      loadStats();
+      setInterval(loadStats, 5000);
+    })();
+
+    const scanBtn = document.getElementById('scanBtn');
+    const rfid = document.getElementById('rfid');
+    const name = document.getElementById('name');
+    const email = document.getElementById('email');
+    const phone = document.getElementById('phone');
+    const department = document.getElementById('department');
+    const position = document.getElementById('position');
+    const register = document.getElementById('register');
+    const status = document.getElementById('status');
+    const messageArea = document.getElementById('messageArea');
+
+    scanBtn.addEventListener('click', () => {
+      rfid.value = '';
+      rfid.focus();
+      status.textContent = 'Waiting for card...';
+    });
+
+    rfid.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const uid = rfid.value.trim();
+        if (!uid) return;
+        status.textContent = 'UID captured';
+        if (!name.value) name.value = `Employee ${uid.slice(-4)}`;
+      }
+    });
+
+    register.addEventListener('click', async () => {
+      const payload = {
+        name: name.value.trim(),
+        rfid_uid: rfid.value.trim(),
+        email: email.value.trim() || undefined,
+        phone: phone.value.trim() || undefined,
+        department: department.value.trim() || undefined,
+        position: position.value.trim() || undefined,
+      };
+
+      if (!payload.name || !payload.rfid_uid) {
+        showMessage('Please provide both a name and RFID UID', 'error');
+        return;
+      }
+
+      setStatus('Registering...');
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/employees`, {
+          method: 'POST', body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Registration failed');
+        showMessage(`Employee ${data.name} registered successfully`, 'success');
+        setStatus('Registered');
+        name.value = '';
+        email.value = '';
+        phone.value = '';
+        department.value = '';
+        position.value = '';
+        rfid.value = '';
+        // Redirect to employees page after small delay
+        setTimeout(() => window.location.href = 'employees.html', 1000);
+      } catch (err) {
+        console.error(err);
+        showMessage(err.message || 'Failed to register', 'error');
+        setStatus('Error');
+      }
+    });
+
+    function showMessage(text, kind = 'success') {
+      messageArea.innerHTML = `<div class="msg ${kind}">${text}</div>`;
+    }
+
+    function setStatus(t) { status.textContent = t; }
+
+    async function loadStats() {
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/reports/status`);
+        if (res.ok) {
+          const j = await res.json();
+          document.getElementById('statEmployees').textContent = j.total_employees;
+          document.getElementById('statScans').textContent = j.today_scans;
+        }
+      } catch (e) { /* ignore */ }
+    }
+  </script>
+</body>
+
+</html>

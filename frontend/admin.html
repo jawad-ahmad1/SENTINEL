@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css?v=7">
+</head>
+
+<body>
+  <!-- Layout Containers -->
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div id="header-container"></div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid animate-enter">
+      <div class="stat-card accent hover-lift">
+        <div class="stat-label">Total Employees</div>
+        <div class="stat-value" id="statEmployees">—</div>
+        <div class="stat-sub">registered</div>
+      </div>
+      <div class="stat-card success hover-lift">
+        <div class="stat-label">Today's Scans</div>
+        <div class="stat-value" id="statScans">—</div>
+        <div class="stat-sub">attendance events</div>
+      </div>
+      <div class="stat-card hover-lift">
+        <div class="stat-label">Currently In</div>
+        <div class="stat-value" id="statIn">—</div>
+        <div class="stat-sub">employees on-site</div>
+      </div>
+      <div class="stat-card hover-lift">
+        <div class="stat-label">On Break</div>
+        <div class="stat-value" id="statBreak">—</div>
+        <div class="stat-sub">employees</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="panel animate-enter delay-100">
+      <div class="panel-title">Quick Actions</div>
+      <div class="actions-grid">
+        <a class="action-card hover-lift" href="reports.html?v=7">
+          <h3>View Reports</h3>
+          <p>Daily, monthly, trends, and employee analytics</p>
+        </a>
+        <a class="action-card hover-lift" href="employees.html?v=7">
+          <h3>Manage Employees</h3>
+          <p>Edit, search, and manage employee records</p>
+        </a>
+        <a class="action-card hover-lift" href="register.html?v=7">
+          <h3>Add Employee</h3>
+          <p>Register a new employee with RFID card</p>
+        </a>
+      </div>
+    </div>
+
+    <!-- System Health -->
+    <div class="panel animate-enter delay-200">
+      <div class="panel-title">System Health</div>
+      <div class="health-grid" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- Backend API -->
+        <div class="stat-item hover-glow">
+          <div style="display:flex; align-items:center;">
+            <div class="status-dot" id="healthDot"></div>
+            <span class="health-label">Backend API</span>
+          </div>
+          <div class="health-val" id="healthStatus">Checking...</div>
+        </div>
+
+        <!-- Frontend -->
+        <div class="stat-item hover-glow">
+          <div style="display:flex; align-items:center;">
+            <div class="status-dot ok"></div>
+            <span class="health-label">Frontend Interface</span>
+          </div>
+          <div class="health-val">Running</div>
+        </div>
+
+        <!-- Database -->
+        <div class="stat-item hover-glow">
+          <div style="display:flex; align-items:center;">
+            <div class="status-dot" id="dbDot"></div>
+            <span class="health-label">Database Connection</span>
+          </div>
+          <div class="health-val" id="dbStatus">Checking...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today's Activity -->
+    <div class="panel animate-enter delay-300">
+      <div class="panel-title">Today's Activity</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Event</th>
+            <th>Time</th>
+            <th>UID</th>
+          </tr>
+        </thead>
+        <tbody id="activityBody">
+          <tr>
+            <td colspan="4" style="color:var(--text-muted)">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <!-- 1. Include Layout -->
+  <script src="js/layout.js?v=7"></script>
+
+  <script>
+    const API_BASE = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';
+
+    // 2. Initialize Layout
+    Layout.init({
+      active: 'dashboard',
+      title: 'Admin Dashboard',
+      subtitle: "System overview, quick actions, and today's activity.",
+      actions: '<button id="topLogoutBtn" class="btn btn-outline" style="color:var(--error-accent); border:1px solid rgba(255,255,255,0.1);">Log Out</button>'
+    });
+
+    // Server-side admin guard — verifies cookie + admin role
+    (async () => {
+      try {
+        const user = await AUTH.requireAdmin();
+        if (!user) return; // redirect already happened
+
+        // Start inactivity timeout (15 min)
+        AUTH.initInactivityTimeout();
+
+        // Wire up the custom logout button injected by Layout
+        const topLogout = document.getElementById('topLogoutBtn');
+        if (topLogout) {
+          topLogout.addEventListener('click', () => AUTH.logout());
+        }
+
+        loadDashboard();
+        setInterval(loadDashboard, 10000);
+      } catch (err) {
+        console.error('Admin Dashboard Init Failed:', err);
+      }
+    })();
+
+    function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c])); }
+
+    async function loadDashboard() {
+      // 1. Load Stats (/status)
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/status`);
+        if (res.ok) {
+          const j = await res.json();
+          document.getElementById('statEmployees').textContent = j.total_employees ?? '—';
+          document.getElementById('statScans').textContent = j.today_scans ?? '—';
+        }
+      } catch (e) {
+        console.warn('Stats load failed', e);
+      }
+
+      // 2. Load Health (/health)
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/health`);
+        if (res.ok) {
+          const h = await res.json();
+          // Backend API (General reachability)
+          document.getElementById('healthDot').className = 'status-dot ok';
+          document.getElementById('healthStatus').textContent = 'Online';
+
+          // Database
+          const dbOk = h.db === true;
+          document.getElementById('dbDot').className = dbOk ? 'status-dot ok' : 'status-dot err';
+          document.getElementById('dbStatus').textContent = dbOk ? 'Connected' : 'Error';
+        } else {
+          throw new Error('Health endpoint returned ' + res.status);
+        }
+      } catch (e) {
+        console.warn('Health load failed', e);
+        document.getElementById('healthDot').className = 'status-dot err';
+        document.getElementById('healthStatus').textContent = 'Offline';
+        document.getElementById('dbDot').className = 'status-dot err';
+        document.getElementById('dbStatus').textContent = 'Unreachable';
+      }
+
+      // 3. Load Today's Activity (/attendance/today)
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/attendance/today`);
+        if (res.ok) {
+          const records = await res.json();
+          const list = Array.isArray(records) ? records : (records.records || []);
+          const tbody = document.getElementById('activityBody');
+
+          if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted)">No activity yet today.</td></tr>';
+          } else {
+            const top20 = list.slice(0, 20); // API returns newest first
+            tbody.innerHTML = '';
+
+            let inCount = 0, breakCount = 0;
+            // Calculate current status (process oldest to newest)
+            [...list].reverse().forEach(r => {
+              if (r.event_type === 'IN') inCount++;
+              if (r.event_type === 'OUT') inCount--;
+              if (r.event_type === 'BREAK_START') { inCount--; breakCount++; }
+              if (r.event_type === 'BREAK_END') { breakCount--; inCount++; }
+            });
+            // Clamp counts (just in case)
+            inCount = Math.max(0, inCount);
+            breakCount = Math.max(0, breakCount);
+
+            document.getElementById('statIn').textContent = inCount;
+            document.getElementById('statBreak').textContent = breakCount;
+
+            top20.forEach(r => {
+              const tr = document.createElement('tr');
+              const evtClass = (r.event_type === 'IN') ? 'in'
+                : (r.event_type === 'OUT') ? 'out' : 'break';
+              const time = r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+              tr.innerHTML = `
+                  <td><strong>${escapeHtml(r.name || 'Unknown')}</strong></td>
+                  <td><span class="event-badge ${evtClass}">${escapeHtml(r.event_type)}</span></td>
+                  <td>${time}</td>
+                  <td><code style="color:var(--text-muted)">${escapeHtml(r.rfid_uid)}</code></td>
+                `;
+              tbody.appendChild(tr);
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Activity load failed', e);
+        // Don't leave it as "Loading..." if failed
+        const tbody = document.getElementById('activityBody');
+        if (tbody && tbody.innerHTML.includes('Loading')) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color:var(--error-accent)">Failed to load activity.</td></tr>';
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>

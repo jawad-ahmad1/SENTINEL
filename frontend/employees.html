@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Employees</title>
+  <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css?v=7">
+</head>
+
+<body>
+  <!-- Layout Containers -->
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div id="header-container"></div>
+
+    <div class="card animate-enter">
+      <div class="toolbar">
+        <input id="search" class="search-input" type="text" placeholder="Search by name, department, or RFID..." />
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>RFID</th>
+            <th>Department</th>
+            <th>Position</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr>
+            <td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading employees...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal-overlay">
+    <div class="modal">
+      <h2>Edit Employee</h2>
+      <div class="field"><label>Name</label><input id="editName" type="text" /></div>
+      <div class="field"><label>Email</label><input id="editEmail" type="text" /></div>
+      <div class="field"><label>Phone</label><input id="editPhone" type="text" /></div>
+      <div class="field"><label>Department</label><input id="editDept" type="text" /></div>
+      <div class="field"><label>Position</label><input id="editPos" type="text" /></div>
+      <input id="editId" type="hidden" />
+      <div class="modal-actions">
+        <button class="cancel" id="editCancel">Cancel</button>
+        <button class="save" id="editSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/layout.js?v=7"></script>
+
+  <script>
+    Layout.init({
+      active: 'employees',
+      title: 'Employee Management',
+      subtitle: 'Manage access control and employee records',
+      actions: `
+        <span class="badge" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); margin-right:12px; padding:8px 12px;">
+            Total: <strong id="totalCount" style="color:white;">-</strong>
+        </span>
+        <a href="register.html?v=7" class="btn btn-primary"><span>+ Register Employee</span></a>
+      `
+    });
+
+    const API_BASE = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';
+
+    // server-side admin guard
+    (async () => {
+      const user = await AUTH.requireAdmin();
+      if (!user) return;
+      AUTH.initInactivityTimeout();
+      loadEmployees();
+    })();
+
+    const tbody = document.getElementById('tbody');
+    const search = document.getElementById('search');
+    // totalCount is now injected dynamically, so we need to get it after Layout.init runs (or it's already in DOM?)
+    // Layout.init injects HTML immediately.
+    let allEmployees = [];
+
+    function renderTable(list) {
+      // Safe visual update
+      const totalEl = document.getElementById('totalCount');
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">No matching records found.</td></tr>';
+        if (totalEl) totalEl.textContent = 0;
+        return;
+      }
+
+      if (totalEl) totalEl.textContent = list.length;
+
+      const rows = list.map(emp => {
+        const status = emp.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>';
+        return `
+          <tr>
+            <td style="font-weight:600; color:white;">${escapeHtml(emp.name)}</td>
+            <td><code style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">${escapeHtml(emp.rfid_uid)}</code></td>
+            <td>${escapeHtml(emp.department || '-')}</td>
+            <td>${escapeHtml(emp.position || '-')}</td>
+            <td>${status}</td>
+            <td>
+              <button class="btn-action" onclick="openEdit(${emp.id})">Edit</button>
+              <button class="btn-action danger" onclick="deleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
+            </td>
+          </tr>`;
+      }).join('');
+      tbody.innerHTML = rows;
+    }
+
+    function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c])); }
+
+    async function loadEmployees() {
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/employees`);
+        if (!res.ok) throw new Error('Failed to load');
+
+        const j = await res.json();
+        allEmployees = Array.isArray(j) ? j : (j.records || []);
+        allEmployees.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        renderTable(allEmployees);
+      } catch (e) { console.error(e); tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--error-accent);">Failed to load data.</td></tr>' }
+    }
+
+    search.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return renderTable(allEmployees);
+      const filtered = allEmployees.filter(emp => (
+        (emp.name && emp.name.toLowerCase().includes(q)) ||
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.department && emp.department.toLowerCase().includes(q)) ||
+        (emp.rfid_uid && emp.rfid_uid.toLowerCase().includes(q))
+      ));
+      renderTable(filtered);
+    });
+
+    window.openEdit = function (id) {
+      const emp = allEmployees.find(e => e.id === id);
+      if (!emp) return;
+      document.getElementById('editId').value = emp.id;
+      document.getElementById('editName').value = emp.name || '';
+      document.getElementById('editEmail').value = emp.email || '';
+      document.getElementById('editPhone').value = emp.phone || '';
+      document.getElementById('editDept').value = emp.department || '';
+      document.getElementById('editPos').value = emp.position || '';
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    document.getElementById('editCancel').addEventListener('click', () => {
+      document.getElementById('editModal').classList.remove('open');
+    });
+
+    document.getElementById('editSave').addEventListener('click', async () => {
+      const id = document.getElementById('editId').value;
+      const payload = {
+        name: document.getElementById('editName').value.trim() || undefined,
+        email: document.getElementById('editEmail').value.trim() || undefined,
+        phone: document.getElementById('editPhone').value.trim() || undefined,
+        department: document.getElementById('editDept').value.trim() || undefined,
+        position: document.getElementById('editPos').value.trim() || undefined,
+      };
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/employees/${id}`, {
+          method: 'PUT', body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Update failed');
+        document.getElementById('editModal').classList.remove('open');
+        loadEmployees();
+      } catch (e) { alert('Failed to update employee: ' + e.message); }
+    });
+
+    window.deleteEmployee = async function (id, name) {
+      if (!confirm(`Deactivate employee "${name}"? This is a soft delete.`)) return;
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/employees/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        loadEmployees();
+      } catch (e) { alert('Failed to delete: ' + e.message); }
+    }
+  </script>
+</body>
+
+</html>

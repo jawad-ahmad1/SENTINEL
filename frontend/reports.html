@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reports</title>
+  <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css?v=7">
+</head>
+
+<body>
+  <!-- Layout Containers -->
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div id="header-container"></div>
+
+    <div class="card animate-enter">
+      <div class="toolbar">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; flex:1;">
+          <input id="dateInput" type="date" />
+          <input id="monthInput" type="month" />
+          <select id="employeeSelect">
+            <option value="">-- Select employee --</option>
+          </select>
+          <button id="loadBtn" class="btn btn-primary">Load Data</button>
+          <button id="csvBtn" class="btn btn-success">Export CSV</button>
+        </div>
+        <div style="color:var(--text-muted); font-size: 0.9rem;">Rows: <span id="count"
+            style="color:white; font-weight:700;">—</span></div>
+      </div>
+
+      <table id="reportTable">
+        <thead id="reportHead">
+          <!-- Dynamic Headers -->
+        </thead>
+        <tbody id="reportBody">
+          <tr>
+            <td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">No data loaded.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script src="js/layout.js?v=7"></script>
+  <script>
+    // Tab HTML to be injected
+    const tabsHTML = `
+      <div class="tabs">
+        <button class="btn-tab active" id="tabDaily">Daily Summary</button>
+        <button class="btn-tab" id="tabMonthly">Monthly Report</button>
+        <button class="btn-tab" id="tabTrends">30-Day Trends</button>
+        <button class="btn-tab" id="tabEmployee">By Employee</button>
+      </div>
+    `;
+
+    Layout.init({
+      active: 'reports',
+      title: 'Attendance Reports & Analytics',
+      subtitle: 'Analytics, daily summaries, and export tools.',
+      actions: tabsHTML
+    });
+
+    const API = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';
+
+    // Server-side admin guard
+    (async () => {
+      const user = await AUTH.requireAdmin();
+      if (!user) return;
+      AUTH.initInactivityTimeout();
+      // Init after confirmed
+      dateInput.value = new Date().toISOString().slice(0, 10);
+      monthInput.value = new Date().toISOString().slice(0, 7);
+
+      // Setup Tabs AFTER layout init
+      setupTabs();
+
+      updateVisibility();
+      loadDaily();
+    })();
+
+    const dateInput = document.getElementById('dateInput');
+    const monthInput = document.getElementById('monthInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const csvBtn = document.getElementById('csvBtn');
+    const reportBody = document.getElementById('reportBody');
+    const reportHead = document.getElementById('reportHead');
+    const count = document.getElementById('count');
+    const employeeSelect = document.getElementById('employeeSelect');
+
+    function formatMinutes(m) { return Number(m).toFixed(2); }
+
+    // Dynamic Headers
+    const HEADERS = {
+      daily: '<tr><th>Name</th><th>RFID</th><th>First In</th><th>Last Out</th><th>Hours</th><th>Events</th></tr>',
+      monthly: '<tr><th>Name</th><th>Days Present</th><th>Total Hours</th><th>Avg Hours/Day</th></tr>',
+      trends: '<tr><th>Date</th><th>Unique Employees</th><th>Total Events</th></tr>',
+      employee: '<tr><th>Date</th><th>Hours</th><th>Events</th></tr>',
+    };
+
+    function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c])); }
+
+    // Daily
+    async function loadDaily(dt) {
+      const dtVal = dt || dateInput.value || new Date().toISOString().slice(0, 10);
+      try {
+        reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading...</td></tr>';
+        const res = await AUTH.fetch(`${API}/api/v1/reports/summary/${dtVal}`);
+        if (!res.ok) throw new Error('Failed to load');
+        const j = await res.json();
+
+        const rows = (j.details || []).map(d => `
+          <tr>
+            <td style="font-weight:600; color:white;">${escapeHtml(d.name)}</td>
+            <td><code style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">${d.employee_id}</code></td>
+            <td>${d.first_in ? new Date(d.first_in).toLocaleTimeString() : '-'}</td>
+            <td>${d.last_out ? new Date(d.last_out).toLocaleTimeString() : '-'}</td>
+            <td>${d.work_hours}</td>
+            <td>${d.total_events}</td>
+          </tr>
+        `).join('');
+
+        reportHead.innerHTML = HEADERS.daily;
+        reportBody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">No attendance records found for this date.</td></tr>';
+        count.textContent = (j.details || []).length;
+      } catch (e) {
+        reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--error-accent);">Error loading data.</td></tr>';
+        console.error(e);
+      }
+    }
+
+    // Monthly
+    async function loadMonthly(ym) {
+      if (!ym) return;
+      const [y, m] = ym.split('-');
+      try {
+        reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading...</td></tr>';
+        const res = await AUTH.fetch(`${API}/api/v1/reports/monthly/${y}/${m}`);
+        if (!res.ok) throw new Error('Failed to load');
+        const j = await res.json();
+
+        const rows = (j.employees || []).map(e => `
+          <tr>
+            <td style="font-weight:600; color:white;">${escapeHtml(e.name)}</td>
+            <td>${e.days_present}</td>
+            <td>${e.total_hours}</td>
+            <td>${e.avg_hours}</td>
+          </tr>
+        `).join('');
+
+        reportHead.innerHTML = HEADERS.monthly;
+        reportBody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">No data found for this month.</td></tr>';
+        count.textContent = (j.employees || []).length;
+      } catch (e) { console.error(e); }
+    }
+
+    // Trends
+    async function loadTrends() {
+      try {
+        reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading...</td></tr>';
+        const res = await AUTH.fetch(`${API}/api/v1/analytics/trends?days=30`);
+        if (!res.ok) throw new Error('Failed');
+        const j = await res.json();
+
+        const rows = (j.trends || []).map(t => `
+          <tr>
+            <td>${t.date}</td>
+            <td>${t.unique_employees}</td>
+            <td>${t.total_events}</td>
+          </tr>
+        `).join('');
+
+        reportHead.innerHTML = HEADERS.trends;
+        reportBody.innerHTML = rows;
+        count.textContent = (j.trends || []).length;
+      } catch (e) { console.error(e); }
+    }
+
+    // Employee Analytics
+    async function loadEmployee(id) {
+      if (!id) return;
+      try {
+        reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading...</td></tr>';
+        const res = await AUTH.fetch(`${API}/api/v1/analytics/employee/${id}`);
+        if (!res.ok) throw new Error('Failed');
+        const j = await res.json();
+
+        const rows = (j.daily_summary || []).slice().reverse().map(d => `
+          <tr>
+            <td>${d.date}</td>
+            <td>${d.hours}</td>
+            <td>${d.events}</td>
+          </tr>
+        `).join('');
+
+        reportHead.innerHTML = HEADERS.employee;
+        reportBody.innerHTML = rows;
+        count.textContent = (j.daily_summary || []).length;
+      } catch (e) { console.error(e); }
+    }
+
+    async function downloadCSV() {
+      const dtVal = dateInput.value || new Date().toISOString().slice(0, 10);
+      try {
+        // Must use fetch to send Auth header, then create blob
+        const res = await AUTH.fetch(`${API}/api/v1/reports/daily/csv?date_str=${dtVal}`);
+        if (!res.ok) throw new Error('Failed to download');
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `attendance_${dtVal}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (e) { alert('Download failed: ' + e.message); }
+    }
+
+    // Load employees for dropdown
+    async function populateEmployees() {
+      try {
+        const res = await AUTH.fetch(`${API}/api/v1/employees?limit=500`);
+        const list = await res.json();
+        const opts = (Array.isArray(list) ? list : (list.records || [])).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
+        employeeSelect.innerHTML = '<option value="">-- Select employee --</option>' + opts;
+      } catch (e) { }
+    }
+
+    // Tab Logic
+    let currentTab = 'daily';
+
+    function updateVisibility() {
+      dateInput.style.display = currentTab === 'daily' ? 'block' : 'none';
+      csvBtn.style.display = currentTab === 'daily' ? 'block' : 'none';
+      monthInput.style.display = currentTab === 'monthly' ? 'block' : 'none';
+      employeeSelect.style.display = currentTab === 'employee' ? 'block' : 'none';
+    }
+
+    function setupTabs() {
+      const tabs = document.querySelectorAll('.btn-tab');
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentTab = btn.id.replace('tab', '').toLowerCase();
+          updateVisibility();
+          // Clear table when switching
+          reportBody.innerHTML = '';
+          reportHead.innerHTML = '';
+
+          if (currentTab === 'daily') loadDaily();
+          if (currentTab === 'monthly') {
+            if (!monthInput.value) monthInput.value = new Date().toISOString().slice(0, 7);
+            loadMonthly(monthInput.value);
+          }
+          if (currentTab === 'trends') loadTrends();
+          if (currentTab === 'employee') populateEmployees();
+        });
+      });
+    }
+
+    loadBtn.addEventListener('click', () => {
+      if (currentTab === 'daily') loadDaily();
+      if (currentTab === 'monthly') loadMonthly(monthInput.value);
+      if (currentTab === 'trends') loadTrends();
+      if (currentTab === 'employee') loadEmployee(employeeSelect.value);
+    });
+
+    csvBtn.addEventListener('click', downloadCSV);
+  </script>
+</body>
+
+</html>

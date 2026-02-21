@@ -1,0 +1,53 @@
+# ── Environment & Secrets ───────────────────────────────────────────
+.env
+*.env.local
+*.env.production
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ── IDE ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Docker ──────────────────────────────────────────────────────────
+# Do not ignore docker-compose.yml or Dockerfile (needed for deployment)
+
+# ── Testing ─────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Backups (generated at runtime) ──────────────────────────────────
+backups/
+*.sql.gz
+*.tar.gz
+
+# ── Logs ────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Alembic ─────────────────────────────────────────────────────────
+# Do not ignore alembic/ (migration scripts are version-controlled)
+
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel - Enterprise Login</title>
+    <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css?v=7">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #030304;
+            color: white;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Split Layout */
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left Side - Branding */
+        .branding-col {
+            flex: 1;
+            background: linear-gradient(135deg, #0f0f13 0%, #050507 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px 40px;
+            /* Increased top/bottom padding to fix logo bleeding */
+            position: relative;
+            overflow: hidden;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Branding Background Effects */
+        .branding-col::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            left: -20%;
+            width: 140%;
+            height: 140%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.03) 0%, transparent 60%);
+            animation: pulseBg 15s infinite alternate;
+        }
+
+        .brand-logo {
+            width: 160px;
+            /* Properly sized */
+            height: auto;
+            margin-bottom: 32px;
+            /* Reduced gap */
+            filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.3));
+            /* Animation removed per user request */
+        }
+
+        .brand-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .brand-subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.6;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Right Side - Login Form */
+        .login-col {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #030304;
+            /* Match deep theme */
+            position: relative;
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 420px;
+            padding: 48px;
+            z-index: 10;
+        }
+
+        .login-header {
+            margin-bottom: 40px;
+        }
+
+        .login-header h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            color: #fff;
+        }
+
+        .login-header p {
+            color: #64748b;
+            margin: 0;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .form-group {
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.05);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        button:hover {
+            background: #5558e6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error-msg {
+            color: #f43f5e;
+            font-size: 0.9rem;
+            margin-top: 16px;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes pulseBg {
+            0% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .branding-col {
+                padding: 40px 20px;
+                flex: 0.4;
+                min-height: 280px;
+            }
+
+            .brand-logo {
+                width: 100px;
+                margin-bottom: 16px;
+            }
+
+            .brand-title {
+                font-size: 1.8rem;
+                margin-bottom: 8px;
+            }
+
+            .brand-subtitle {
+                font-size: 0.95rem;
+            }
+
+            .login-box {
+                padding: 32px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Brand Column -->
+        <div class="branding-col">
+            <div class="brand-logo">
+                <img src="/img/logo.png?v=3" alt="Sentinel Logo" style="width:100%; height:auto;">
+            </div>
+            <div class="brand-title">Welcome Back</div>
+            <div class="brand-subtitle">Secure. Fast. Reliable.<br>Next Generation Attendance Tracking</div>
+        </div>
+
+        <!-- Login Column -->
+        <div class="login-col">
+            <div class="login-box">
+                <div class="login-header">
+                    <h2>Welcome Back</h2>
+                    <p>Sign in to access the dashboard</p>
+                </div>
+
+                <form class="login-form" id="loginForm">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="text" id="email" placeholder="admin@sentinel.com" autofocus>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="••••••••">
+                    </div>
+
+                    <button type="submit" id="loginBtn">Sign In</button>
+                    <div class="error-msg" id="errorText" style="opacity:0"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        const API_BASE = window.location.origin && window.location.protocol !== 'file:'
+            ? window.location.origin
+            : 'http://127.0.0.1:8000';
+
+        // Check if already logged in — go straight to admin
+        if (AUTH.isLoggedIn()) {
+            window.location.href = 'admin.html';
+        }
+
+        const form = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorText = document.getElementById('errorText');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorText.style.opacity = '0';
+            loginBtn.innerHTML = '<span style="opacity:0.7">Authenticating...</span>';
+            loginBtn.style.pointerEvents = 'none';
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+
+                const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    credentials: 'include',
+                    body: formData
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+                // Get Role (must include credentials to send the session cookie)
+                try {
+                    const meRes = await fetch(`${API_BASE}/api/v1/auth/me`, { credentials: 'include' });
+                    if (meRes.ok) AUTH.login(await meRes.json());
+                    else AUTH.login({});
+                } catch (_) { AUTH.login({}); }
+
+                // Redirect to admin dashboard
+                window.location.href = 'admin.html';
+
+            } catch (err) {
+                console.error(err);
+                errorText.textContent = err.message === 'Incorrect email or password' ? 'Invalid credentials.' : err.message;
+                errorText.style.opacity = '1';
+                loginBtn.innerHTML = 'Sign In';
+                loginBtn.style.pointerEvents = 'auto';
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel Kiosk</title>
+    <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css?v=7">
+    <style>
+        /* Kiosk Specific Overrides - Aesthetic Polish */
+        body {
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .ambient-mesh {
+            position: absolute;
+            inset: 0;
+            background:
+                conic-gradient(from 0deg at 50% 50%, #000000 0%, #1e1b4b 25%, #000000 50%, #0f172a 75%, #000000 100%),
+                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15), transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.1), transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.8;
+            filter: blur(40px);
+            animation: ambientShift 30s ease-in-out infinite alternate;
+        }
+
+        .kiosk-container {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 0.9fr;
+            /* Tighter ratio */
+            gap: 40px;
+            width: 90%;
+            max-width: 900px;
+            /* Reduced from 1200px */
+            animation: listEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+
+        /* Scanner Panel */
+        .scanner-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .clock-display {
+            font-size: 3.5rem;
+            /* Reduced from 5rem */
+            font-weight: 800;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.05em;
+            background: linear-gradient(180deg, #fff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.2));
+            transition: all 0.3s ease;
+        }
+
+        .date-display {
+            font-size: 1.1rem;
+            /* Reduced from 1.5rem */
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 40px;
+            /* Reduced spacing */
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .visualizer-container {
+            width: 200px;
+            /* Reduced from 280px */
+            height: 200px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+
+        .scan-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.05);
+            transition: all 0.5s ease;
+        }
+
+        .scan-ring.outer {
+            width: 100%;
+            height: 100%;
+            border-style: dashed;
+            animation: spin 20s linear infinite;
+        }
+
+        .scan-ring.inner {
+            width: 70%;
+            height: 70%;
+            border-color: var(--success-accent, #10b981);
+            opacity: 0.5;
+            animation: spin 10s linear infinite reverse;
+        }
+
+        .scan-icon {
+            font-size: 3rem;
+            /* Reduced from 4rem */
+            animation: pulse-glow 3s ease-in-out infinite;
+            filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.4));
+        }
+
+        .scan-status {
+            font-size: 1.5rem;
+            /* Reduced from 2rem */
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .scan-instruction {
+            font-size: 0.95rem;
+            /* Reduced from 1.1rem */
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Feed Panel */
+        .feed-panel {
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 480px;
+            /* Fixed height for consistency in compact mode */
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, border-color 0.3s;
+        }
+
+        .feed-panel:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .feed-header {
+            padding: 16px 24px;
+            /* Reduced padding */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .feed-title {
+            font-size: 1rem;
+            /* Reduced from 1.25rem */
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .live-indicator {
+            background: rgba(244, 63, 94, 0.1);
+            color: #f43f5e;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.1);
+        }
+
+        .live-indicator::before {
+            content: '';
+            display: block;
+            width: 6px;
+            height: 6px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: blink 1s steps(2) infinite;
+        }
+
+        .feed-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes blink {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+                filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.3));
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+                filter: drop-shadow(0 0 25px rgba(99, 102, 241, 0.6));
+            }
+        }
+
+        @keyframes ambientShift {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.1);
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes listEnter {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Admin Button Positioned Absolute on Screen */
+        .admin-trigger {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 100;
+            opacity: 0.3;
+            transition: all 0.3s;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.8rem;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-weight: 500;
+        }
+
+        .admin-trigger:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Invisible Input for RFID Catching */
+        #rfidInput {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-mesh"></div>
+
+    <!-- Admin Access — clears session, forces fresh login -->
+    <a href="#" class="admin-trigger"
+        onclick="event.preventDefault(); localStorage.clear(); sessionStorage.clear(); window.location.href='login.html';">Admin
+        Access</a>
+
+    <div class="kiosk-container">
+        <!-- Scanner Panel -->
+        <main class="scanner-panel">
+            <div id="clock" class="clock-display">00:00:00</div>
+            <div id="date" class="date-display">...</div>
+
+            <div class="visualizer-container" id="visualizer">
+                <div class="scan-ring outer"></div>
+                <div class="scan-ring inner"></div>
+                <div class="scan-icon" id="scanIcon">📡</div>
+            </div>
+
+            <div class="scan-status" id="scanTitle">Ready to Scan</div>
+            <p class="scan-instruction" id="scanSubtitle">Hold your badge near the reader</p>
+        </main>
+
+        <!-- Feed Panel -->
+        <aside class="feed-panel">
+            <header class="feed-header">
+                <div class="feed-title">
+                    <span>Recent Activity</span>
+                </div>
+                <div class="live-indicator">LIVE</div>
+            </header>
+            <div class="feed-list" id="feedList">
+                <div style="text-align:center; padding: 60px; color: var(--text-muted); opacity:0.5;">
+                    Waiting for scans...
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <input type="text" id="rfidInput" autofocus>
+
+    <script src="js/script.js?v=7"></script>
+</body>
+
+</html>

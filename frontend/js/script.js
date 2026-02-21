@@ -13,7 +13,7 @@ class ProfessionalKiosk {
     constructor() {
         this.config = {
             apiBase: API_BASE,
-            apiUrl: '/api/v1/employees/scan',
+            apiUrl: '/api/v1/scan',
             resetDelay: 3000,
             debounceTime: 1200
         };

@@ -36,11 +36,6 @@
         <div class="stat-value" id="statIn">—</div>
         <div class="stat-sub">employees on-site</div>
       </div>
-      <div class="stat-card hover-lift">
-        <div class="stat-label">On Break</div>
-        <div class="stat-value" id="statBreak">—</div>
-        <div class="stat-sub">employees</div>
-      </div>
     </div>
 
     <!-- Quick Actions -->
@@ -206,20 +201,18 @@
             const top20 = list.slice(0, 20); // API returns newest first
             tbody.innerHTML = '';
 
-            let inCount = 0, breakCount = 0;
+            let inCount = 0;
             // Calculate current status (process oldest to newest)
             [...list].reverse().forEach(r => {
               if (r.event_type === 'IN') inCount++;
               if (r.event_type === 'OUT') inCount--;
-              if (r.event_type === 'BREAK_START') { inCount--; breakCount++; }
-              if (r.event_type === 'BREAK_END') { breakCount--; inCount++; }
+              if (r.event_type === 'BREAK_START') { inCount--; }
+              if (r.event_type === 'BREAK_END') { inCount++; }
             });
             // Clamp counts (just in case)
             inCount = Math.max(0, inCount);
-            breakCount = Math.max(0, breakCount);
 
             document.getElementById('statIn').textContent = inCount;
-            document.getElementById('statBreak').textContent = breakCount;
 
             top20.forEach(r => {
               const tr = document.createElement('tr');

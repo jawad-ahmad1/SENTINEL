@@ -20,13 +20,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
 from app.api.v1.deps import get_current_active_user, get_db
+from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
 from app.schemas.attendance import (
+    AbsenceDayDetail,
+    AbsenceEmployeeDetail,
+    AbsenceReportResponse,
     AttendanceFeedItem,
     DailySummaryResponse,
     EmployeeAnalyticsResponse,
     HealthResponse,
+    LiveStatsResponse,
     MonthlyReportResponse,
     StatusResponse,
     TrendsResponse,
@@ -403,3 +408,237 @@ async def system_status(
         today_scans=scan_count.scalar() or 0,
         status="operational",
     )
+
+
+# ── Monthly Absence Report ──────────────────────────────────────────
+@router.get("/reports/absence/{year}/{month}", response_model=AbsenceReportResponse)
+async def absence_report(
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_active_user),
+) -> AbsenceReportResponse:
+    """Generate a monthly absence report with daily breakdown and employee details."""
+    import calendar as cal_mod
+    from datetime import timedelta
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be 1-12")
+
+    # Get all active employees
+    emp_result = await db.execute(
+        select(Employee).where(Employee.is_active.is_(True)).order_by(Employee.name)
+    )
+    employees = list(emp_result.scalars().all())
+    total_employees = len(employees)
+
+    if total_employees == 0:
+        return AbsenceReportResponse(
+            year=year, month=month, month_name=cal_mod.month_name[month],
+            total_working_days=0, total_employees=0, total_absences=0,
+            absence_rate=0.0, daily_breakdown=[], employee_details=[],
+            perfect_attendance=[], concerning_absences=[],
+        )
+
+    # Determine working days (Mon-Fri) in the month
+    _, days_in_month = cal_mod.monthrange(year, month)
+    working_days = []
+    for day in range(1, days_in_month + 1):
+        d = date(year, month, day)
+        if d.weekday() < 5:  # Mon=0 ... Fri=4
+            working_days.append(d)
+
+    # Only include working days up to today (don't count future days as absences)
+    today = date.today()
+    working_days = [d for d in working_days if d <= today]
+    total_working_days = len(working_days)
+
+    if total_working_days == 0:
+        return AbsenceReportResponse(
+            year=year, month=month, month_name=cal_mod.month_name[month],
+            total_working_days=0, total_employees=total_employees, total_absences=0,
+            absence_rate=0.0, daily_breakdown=[], employee_details=[],
+            perfect_attendance=[e.name for e in employees], concerning_absences=[],
+        )
+
+    # Fetch ALL attendance for this month in ONE query
+    month_start = f"{year}-{month:02d}-01"
+    month_end = f"{year}-{month:02d}-{days_in_month:02d}"
+    att_result = await db.execute(
+        select(Attendance)
+        .where(Attendance.date >= month_start, Attendance.date <= month_end)
+        .order_by(Attendance.date)
+    )
+    all_attendance = list(att_result.scalars().all())
+
+    # Build lookup: date_str -> set of employee_ids who attended
+    attendance_by_date: dict[str, set[int]] = defaultdict(set)
+    for att in all_attendance:
+        attendance_by_date[att.date].add(att.employee_id)
+
+    # Build lookup: employee_id -> list of absent dates
+    emp_absent_dates: dict[int, list[str]] = defaultdict(list)
+
+    # Compute daily breakdown
+    daily_breakdown = []
+    total_absences = 0
+    for wd in working_days:
+        date_str = wd.strftime("%Y-%m-%d")
+        present_ids = attendance_by_date.get(date_str, set())
+        present = len(present_ids)
+        absent = total_employees - present
+        total_absences += absent
+        absence_rate = round((absent / total_employees) * 100, 1) if total_employees > 0 else 0.0
+
+        daily_breakdown.append(AbsenceDayDetail(
+            date=date_str,
+            day_name=wd.strftime("%A"),
+            expected=total_employees,
+            present=present,
+            absent=absent,
+            absence_rate=absence_rate,
+        ))
+
+        # Track which employees were absent each day
+        for emp in employees:
+            if emp.id not in present_ids:
+                emp_absent_dates[emp.id].append(date_str)
+
+    # Employee absence details (only those with >=1 absence)
+    employee_details = []
+    perfect_attendance = []
+    concerning_absences = []
+    for emp in employees:
+        absent_dates = emp_absent_dates.get(emp.id, [])
+        if len(absent_dates) == 0:
+            perfect_attendance.append(emp.name)
+        else:
+            detail = AbsenceEmployeeDetail(
+                employee_id=emp.id,
+                name=emp.name,
+                department=emp.department,
+                days_absent=len(absent_dates),
+                dates_absent=absent_dates,
+            )
+            employee_details.append(detail)
+            if len(absent_dates) > 5:
+                concerning_absences.append(detail)
+
+    # Sort employee details by most absences first
+    employee_details.sort(key=lambda x: x.days_absent, reverse=True)
+    concerning_absences.sort(key=lambda x: x.days_absent, reverse=True)
+
+    overall_absence_rate = round(
+        (total_absences / (total_employees * total_working_days)) * 100, 1
+    ) if (total_employees * total_working_days) > 0 else 0.0
+
+    return AbsenceReportResponse(
+        year=year,
+        month=month,
+        month_name=cal_mod.month_name[month],
+        total_working_days=total_working_days,
+        total_employees=total_employees,
+        total_absences=total_absences,
+        absence_rate=overall_absence_rate,
+        daily_breakdown=daily_breakdown,
+        employee_details=employee_details,
+        perfect_attendance=perfect_attendance,
+        concerning_absences=concerning_absences,
+    )
+
+
+# ── Live Stats (PUBLIC — kiosk idle screen) ─────────────────────────
+@router.get("/attendance/live-stats", response_model=LiveStatsResponse)
+async def live_stats(
+    db: AsyncSession = Depends(get_db),
+) -> LiveStatsResponse:
+    """Real-time attendance counts for the kiosk idle screen and admin dashboard."""
+    from datetime import timedelta
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Total active employees
+    emp_result = await db.execute(
+        select(func.count(Employee.id)).where(Employee.is_active.is_(True))
+    )
+    total_employees = emp_result.scalar() or 0
+
+    # Today's scan count
+    scan_result = await db.execute(
+        select(func.count(Attendance.id)).where(Attendance.date == today_str)
+    )
+    today_scans = scan_result.scalar() or 0
+
+    # Fetch all today's attendance in one query
+    att_result = await db.execute(
+        select(Attendance)
+        .where(Attendance.date == today_str)
+        .order_by(Attendance.employee_id, Attendance.timestamp.asc())
+    )
+    all_today = list(att_result.scalars().all())
+
+    # Group by employee — determine who is currently IN (last event = IN)
+    from itertools import groupby
+    employee_events: dict[int, list[Attendance]] = defaultdict(list)
+    for att in all_today:
+        employee_events[att.employee_id].append(att)
+
+    present = 0
+    late = 0
+    on_time = 0
+
+    # Read attendance settings for late calculation
+    work_start = "09:00"
+    grace_minutes = 15
+    tz_offset = "+05:00"
+    try:
+        settings_result = await db.execute(select(AttendanceSettings).limit(1))
+        att_settings = settings_result.scalar_one_or_none()
+        if att_settings:
+            work_start = att_settings.work_start
+            grace_minutes = att_settings.grace_minutes
+            tz_offset = att_settings.timezone_offset
+    except Exception:
+        pass
+
+    for emp_id, events in employee_events.items():
+        sorted_events = sorted(events, key=lambda e: e.timestamp)
+        last_event = sorted_events[-1]
+        if last_event.event_type == "IN":
+            present += 1
+
+        # Check if first IN was late
+        first_in = next((e for e in sorted_events if e.event_type == "IN"), None)
+        if first_in:
+            ts = first_in.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+
+            sign = 1 if tz_offset[0] == '+' else -1
+            offset_parts = tz_offset[1:].split(":")
+            offset_hours = int(offset_parts[0])
+            offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
+            local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
+            local_tz = timezone(local_offset)
+            local_time = ts.astimezone(local_tz)
+
+            start_parts = work_start.split(":")
+            start_hour, start_min = int(start_parts[0]), int(start_parts[1])
+            cutoff = local_time.replace(hour=start_hour, minute=start_min, second=0, microsecond=0) + timedelta(minutes=grace_minutes)
+
+            if local_time > cutoff:
+                late += 1
+            else:
+                on_time += 1
+
+    absent = max(0, total_employees - len(employee_events))
+
+    return LiveStatsResponse(
+        total_employees=total_employees,
+        present=present,
+        absent=absent,
+        late=late,
+        on_time=on_time,
+        today_scans=today_scans,
+    )
+

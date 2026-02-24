@@ -51,6 +51,7 @@ const Layout = {
             { id: 'employees', label: 'Employees', href: 'employees.html', icon: '👥' },
             { id: 'reports', label: 'Reports', href: 'reports.html', icon: '📈' },
             { id: 'register', label: 'Register New', href: 'register.html', icon: '✨' },
+            { id: 'settings', label: 'Settings', href: 'settings.html', icon: '⚙️' },
         ];
 
         const generateNav = () => menuItems.map(item => {

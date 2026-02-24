@@ -36,6 +36,11 @@
         <div class="stat-value" id="statIn">—</div>
         <div class="stat-sub">employees on-site</div>
       </div>
+      <div class="stat-card warning hover-lift" style="--accent: #f59e0b;">
+        <div class="stat-label">Late Today</div>
+        <div class="stat-value" id="statLate">—</div>
+        <div class="stat-sub">arrived after grace</div>
+      </div>
     </div>
 
     <!-- Quick Actions -->
@@ -161,6 +166,18 @@
         }
       } catch (e) {
         console.warn('Stats load failed', e);
+      }
+
+      // 1b. Load Live Stats (/attendance/live-stats) for Present/Late
+      try {
+        const lres = await fetch(`${API_BASE}/api/v1/attendance/live-stats`, { credentials: 'include' });
+        if (lres.ok) {
+          const ls = await lres.json();
+          document.getElementById('statIn').textContent = ls.present ?? '—';
+          document.getElementById('statLate').textContent = ls.late ?? '0';
+        }
+      } catch (e) {
+        console.warn('Live stats load failed', e);
       }
 
       // 2. Load Health (/health)

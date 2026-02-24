@@ -9,7 +9,7 @@ Employee CRUD + RFID scan + break endpoints.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
+from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
 from app.schemas.attendance import (
@@ -35,6 +36,53 @@ router = APIRouter(tags=["employees"])
 logger = logging.getLogger(__name__)
 
 
+def _compute_today_hours(events: list[Attendance]) -> float:
+    """Calculate accumulated work hours from today's IN/OUT pairs."""
+    total_seconds = 0.0
+    last_in_time = None
+    # Process oldest first
+    for ev in sorted(events, key=lambda e: e.timestamp):
+        ts = ev.timestamp
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ev.event_type == "IN":
+            last_in_time = ts
+        elif ev.event_type == "OUT" and last_in_time is not None:
+            total_seconds += (ts - last_in_time).total_seconds()
+            last_in_time = None
+    # If currently clocked in, count up to now
+    if last_in_time is not None:
+        total_seconds += (datetime.now(timezone.utc) - last_in_time).total_seconds()
+    return round(total_seconds / 3600, 2)
+
+
+def _check_is_late(events: list[Attendance], work_start: str, grace_minutes: int, tz_offset: str) -> bool:
+    """Check if the employee's first IN today was after work_start + grace."""
+    in_events = [e for e in events if e.event_type == "IN"]
+    if not in_events:
+        return False
+    first_in = sorted(in_events, key=lambda e: e.timestamp)[0]
+    ts = first_in.timestamp
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+
+    # Parse timezone offset to convert UTC to local
+    sign = 1 if tz_offset[0] == '+' else -1
+    offset_parts = tz_offset[1:].split(":")
+    offset_hours = int(offset_parts[0])
+    offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
+    local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
+    local_tz = timezone(local_offset)
+    local_time = ts.astimezone(local_tz)
+
+    # Parse work_start (HH:MM)
+    start_parts = work_start.split(":")
+    start_hour, start_min = int(start_parts[0]), int(start_parts[1])
+    cutoff = local_time.replace(hour=start_hour, minute=start_min, second=0, microsecond=0) + timedelta(minutes=grace_minutes)
+
+    return local_time > cutoff
+
+
 # ── RFID Scan (PUBLIC — kiosk does not require login) ───────────────
 @router.post("/scan", response_model=ScanResponse)
 async def scan_card(
@@ -44,10 +92,10 @@ async def scan_card(
     """Record an RFID card tap — toggles between IN and OUT.
     
     Uses WRITE LOCKING (with_for_update) to prevent race conditions (double tap).
+    Returns enriched response with today's hours, last event, and late status.
     """
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Start transaction implicitly managed by FastAPI dependency, but we want explicit locking logic
     # Find or auto-register employee
     result = await db.execute(
         select(Employee).where(Employee.rfid_uid == body.uid)
@@ -67,8 +115,6 @@ async def scan_card(
             logger.info("Auto-registered employee %s (UID %s)", employee.name, body.uid)
         except IntegrityError:
             await db.rollback()
-            # Race condition hit: another request created it just now.
-            # Re-fetch the employee.
             result = await db.execute(
                 select(Employee).where(Employee.rfid_uid == body.uid)
             )
@@ -78,34 +124,24 @@ async def scan_card(
     if not employee.is_active:
         raise HTTPException(status_code=403, detail="Employee account is deactivated")
 
-    # CRITICAL FIX: Lock the last attendance record to prevent race conditions
-    # We lock the rows for this employee for this day to serialize duplicate requests
-    # Note: with_for_update() requires a transaction.
-    
+    # Lock last event to prevent race conditions
     last_result = await db.execute(
         select(Attendance)
         .where(Attendance.employee_id == employee.id, Attendance.date == today_str)
         .order_by(Attendance.timestamp.desc())
         .limit(1)
-        .with_for_update()  # <--- LOCKS ROW until commit
+        .with_for_update()
     )
     last_event = last_result.scalar_one_or_none()
     event_type = "OUT" if last_event and last_event.event_type == "IN" else "IN"
 
-    # Anti-bounce check: If last event was < 5 seconds ago, ignore it? 
-    # Optional but good practice. For now, the lock prevents simultaneous writes.
-    # If the second request gets the lock after the first commits, it will see the NEW state 
-    # and toggle back (IN -> OUT -> IN).
-    # To strictly prevent "double tap" (IN..IN), we can check timestamp.
-    
+    # Anti-bounce check
     if last_event:
         last_ts = last_event.timestamp
         if last_ts.tzinfo is None:
             last_ts = last_ts.replace(tzinfo=timezone.utc)
         
         if (datetime.now(timezone.utc) - last_ts).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
-            # It's a "bounce" or double tap. Return the existing state instead of creating new one.
-            # This is better UX than toggling twice instantly.
             return ScanResponse(
                 success=True,
                 event=last_event.event_type,
@@ -129,6 +165,31 @@ async def scan_card(
 
     logger.info("Scan %s for %s (UID %s)", event_type, employee.name, body.uid)
 
+    # ── Compute enriched data ─────────────────────────────────────
+    # Fetch all of today's events for this employee (including the one just created)
+    all_today_result = await db.execute(
+        select(Attendance)
+        .where(Attendance.employee_id == employee.id, Attendance.date == today_str)
+        .order_by(Attendance.timestamp.asc())
+    )
+    all_today = list(all_today_result.scalars().all())
+
+    today_hours = _compute_today_hours(all_today)
+
+    # Last event info (the event *before* this one)
+    last_event_type = last_event.event_type if last_event else None
+    last_event_time = last_event.timestamp.isoformat() if last_event else None
+
+    # Late check — read attendance settings
+    is_late = False
+    try:
+        settings_result = await db.execute(select(AttendanceSettings).limit(1))
+        att_settings = settings_result.scalar_one_or_none()
+        if att_settings:
+            is_late = _check_is_late(all_today, att_settings.work_start, att_settings.grace_minutes, att_settings.timezone_offset)
+    except Exception:
+        pass  # If settings table doesn't exist yet, don't crash the scan
+
     return ScanResponse(
         success=True,
         event=event_type,
@@ -136,6 +197,10 @@ async def scan_card(
         name=employee.name,
         attendance_id=attendance.id,
         attendance_timestamp=now.isoformat(),
+        today_hours=today_hours,
+        last_event_type=last_event_type,
+        last_event_time=last_event_time,
+        is_late=is_late,
     )
 
 

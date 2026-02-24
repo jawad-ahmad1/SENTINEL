@@ -378,6 +378,223 @@
             justify-content: center;
             text-shadow: 0 0 10px currentColor;
         }
+
+        /* ── Live Stats Bar ── */
+        .live-stats-bar {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .live-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .live-stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .live-stat-value.present {
+            color: #10b981;
+        }
+
+        .live-stat-value.absent {
+            color: #f43f5e;
+        }
+
+        .live-stat-value.late {
+            color: #f59e0b;
+        }
+
+        .live-stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+        }
+
+        /* ── Scan Result Overlay ── */
+        .scan-result-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            animation: overlayFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .scan-result-overlay.active {
+            display: flex;
+        }
+
+        .scan-result-card {
+            background: rgba(15, 15, 20, 0.92);
+            backdrop-filter: blur(30px);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px 48px;
+            text-align: center;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7);
+            animation: cardSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .scan-result-card .result-emoji {
+            font-size: 3.5rem;
+            margin-bottom: 12px;
+        }
+
+        .scan-result-card .result-name {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .scan-result-card .result-badge {
+            display: inline-block;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 20px;
+        }
+
+        .result-badge.badge-in {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .result-badge.badge-out {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .result-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .result-detail-item {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .result-detail-item .detail-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .result-detail-item .detail-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .late-warning {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.02em;
+            margin-top: 8px;
+        }
+
+        .result-progress-bar {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .result-progress-bar .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #10b981);
+            border-radius: 2px;
+            animation: progressCountdown 5s linear forwards;
+        }
+
+        /* ── State Background Overlays ── */
+        body.state-success .ambient-mesh {
+            background:
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.25), transparent 70%) !important;
+            opacity: 1 !important;
+            transition: all 0.5s;
+        }
+
+        body.state-error .ambient-mesh {
+            background:
+                radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.25), transparent 70%) !important;
+            opacity: 1 !important;
+            transition: all 0.5s;
+        }
+
+        body.state-late .ambient-mesh {
+            background:
+                radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.25), transparent 70%) !important;
+            opacity: 1 !important;
+            transition: all 0.5s;
+        }
+
+        @keyframes overlayFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes cardSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes progressCountdown {
+            from {
+                width: 100%;
+            }
+
+            to {
+                width: 0%;
+            }
+        }
     </style>
 </head>
 
@@ -394,6 +611,22 @@
         <main class="scanner-panel">
             <div id="clock" class="clock-display">00:00:00</div>
             <div id="date" class="date-display">...</div>
+
+            <!-- Live Stats Bar -->
+            <div class="live-stats-bar" id="liveStatsBar">
+                <div class="live-stat">
+                    <div class="live-stat-value present" id="statPresent">—</div>
+                    <div class="live-stat-label">Present</div>
+                </div>
+                <div class="live-stat">
+                    <div class="live-stat-value absent" id="statAbsent">—</div>
+                    <div class="live-stat-label">Absent</div>
+                </div>
+                <div class="live-stat">
+                    <div class="live-stat-value late" id="statLate">—</div>
+                    <div class="live-stat-label">Late</div>
+                </div>
+            </div>
 
             <div class="visualizer-container" id="visualizer">
                 <div class="scan-ring outer"></div>
@@ -423,7 +656,38 @@
 
     <input type="text" id="rfidInput" autofocus>
 
-    <script src="js/script.js?v=7"></script>
+    <!-- Scan Result Overlay -->
+    <div class="scan-result-overlay" id="scanResultOverlay">
+        <div class="scan-result-card">
+            <div class="result-emoji" id="resultEmoji">✅</div>
+            <div class="result-name" id="resultName">—</div>
+            <div class="result-badge badge-in" id="resultBadge">CHECKED IN</div>
+            <div class="result-details">
+                <div class="result-detail-item">
+                    <div class="detail-label">Time</div>
+                    <div class="detail-value" id="resultTime">—</div>
+                </div>
+                <div class="result-detail-item">
+                    <div class="detail-label">Today's Hours</div>
+                    <div class="detail-value" id="resultHours">—</div>
+                </div>
+                <div class="result-detail-item">
+                    <div class="detail-label">Previous Event</div>
+                    <div class="detail-value" id="resultLastEvent">—</div>
+                </div>
+                <div class="result-detail-item">
+                    <div class="detail-label">Previous Time</div>
+                    <div class="detail-value" id="resultLastTime">—</div>
+                </div>
+            </div>
+            <div class="late-warning" id="lateWarning" style="display:none">⚠ YOU ARE LATE</div>
+            <div class="result-progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/script.js?v=8"></script>
 </body>
 
 </html>

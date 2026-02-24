@@ -57,6 +57,7 @@
         <button class="btn-tab" id="tabMonthly">Monthly Report</button>
         <button class="btn-tab" id="tabTrends">30-Day Trends</button>
         <button class="btn-tab" id="tabEmployee">By Employee</button>
+        <button class="btn-tab" id="tabAbsence">Absence Report</button>
       </div>
     `;
 
@@ -102,6 +103,7 @@
       monthly: '<tr><th>Name</th><th>Days Present</th><th>Total Hours</th><th>Avg Hours/Day</th></tr>',
       trends: '<tr><th>Date</th><th>Unique Employees</th><th>Total Events</th></tr>',
       employee: '<tr><th>Date</th><th>Hours</th><th>Events</th></tr>',
+      absence: '',
     };
 
     function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[c])); }
@@ -240,7 +242,7 @@
     function updateVisibility() {
       dateInput.style.display = currentTab === 'daily' ? 'block' : 'none';
       csvBtn.style.display = currentTab === 'daily' ? 'block' : 'none';
-      monthInput.style.display = currentTab === 'monthly' ? 'block' : 'none';
+      monthInput.style.display = (currentTab === 'monthly' || currentTab === 'absence') ? 'block' : 'none';
       employeeSelect.style.display = currentTab === 'employee' ? 'block' : 'none';
     }
 
@@ -263,6 +265,10 @@
           }
           if (currentTab === 'trends') loadTrends();
           if (currentTab === 'employee') populateEmployees();
+          if (currentTab === 'absence') {
+            if (!monthInput.value) monthInput.value = new Date().toISOString().slice(0, 7);
+            loadAbsence(monthInput.value);
+          }
         });
       });
     }
@@ -272,9 +278,111 @@
       if (currentTab === 'monthly') loadMonthly(monthInput.value);
       if (currentTab === 'trends') loadTrends();
       if (currentTab === 'employee') loadEmployee(employeeSelect.value);
+      if (currentTab === 'absence') loadAbsence(monthInput.value);
     });
 
     csvBtn.addEventListener('click', downloadCSV);
+
+    // ── Absence Report ──────────────────────────────────────────
+    async function loadAbsence(monthStr) {
+      if (!monthStr) monthStr = new Date().toISOString().slice(0, 7);
+      const [year, month] = monthStr.split('-').map(Number);
+
+      reportHead.innerHTML = '';
+      reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--text-muted);">Loading absence report...</td></tr>';
+
+      try {
+        const res = await AUTH.fetch(`${API}/api/v1/reports/absence/${year}/${month}`);
+        if (!res.ok) throw new Error('Failed to load absence report');
+        const data = await res.json();
+
+        // Build a rich absence report in the table area
+        let html = '';
+
+        // Summary cards row
+        html += `<tr><td colspan="6" style="padding:0;">
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;">
+            <div style="background:rgba(99,102,241,0.08); border-radius:12px; padding:16px; text-align:center;">
+              <div style="font-size:0.7rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600; margin-bottom:4px;">Working Days</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#818cf8;">${data.total_working_days}</div>
+            </div>
+            <div style="background:rgba(16,185,129,0.08); border-radius:12px; padding:16px; text-align:center;">
+              <div style="font-size:0.7rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600; margin-bottom:4px;">Total Employees</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#10b981;">${data.total_employees}</div>
+            </div>
+            <div style="background:rgba(244,63,94,0.08); border-radius:12px; padding:16px; text-align:center;">
+              <div style="font-size:0.7rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600; margin-bottom:4px;">Total Absences</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#f43f5e;">${data.total_absences}</div>
+            </div>
+            <div style="background:rgba(245,158,11,0.08); border-radius:12px; padding:16px; text-align:center;">
+              <div style="font-size:0.7rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600; margin-bottom:4px;">Absence Rate</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#f59e0b;">${data.absence_rate}%</div>
+            </div>
+          </div>
+        </td></tr>`;
+
+        // Daily breakdown table
+        if (data.daily_breakdown && data.daily_breakdown.length > 0) {
+          html += `<tr><td colspan="6" style="padding:8px 0;"><strong style="font-size:1rem;">📅 Daily Breakdown</strong></td></tr>`;
+          html += '<tr><th>Date</th><th>Day</th><th>Expected</th><th>Present</th><th>Absent</th><th>Absence %</th></tr>';
+          data.daily_breakdown.forEach(d => {
+            const rowColor = d.absence_rate > 20 ? 'color:#f43f5e;' : '';
+            html += `<tr>
+              <td>${escapeHtml(d.date)}</td>
+              <td>${escapeHtml(d.day_name)}</td>
+              <td>${d.expected}</td>
+              <td style="color:#10b981;">${d.present}</td>
+              <td style="color:#f43f5e;">${d.absent}</td>
+              <td style="${rowColor}">${d.absence_rate}%</td>
+            </tr>`;
+          });
+        }
+
+        // Employee details
+        if (data.employee_details && data.employee_details.length > 0) {
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem;">👤 Employee Absence Details</strong></td></tr>`;
+          html += '<tr><th>Name</th><th>Department</th><th>Days Absent</th><th colspan="3">Dates</th></tr>';
+          data.employee_details.forEach(emp => {
+            const datesStr = emp.dates_absent.slice(0, 5).join(', ') + (emp.dates_absent.length > 5 ? ` +${emp.dates_absent.length - 5} more` : '');
+            const style = emp.days_absent > 5 ? 'color:#f43f5e; font-weight:700;' : '';
+            html += `<tr>
+              <td style="font-weight:600;">${escapeHtml(emp.name)}</td>
+              <td>${escapeHtml(emp.department || 'N/A')}</td>
+              <td style="${style}">${emp.days_absent}</td>
+              <td colspan="3" style="font-size:0.85rem; color:rgba(255,255,255,0.5);">${escapeHtml(datesStr)}</td>
+            </tr>`;
+          });
+        }
+
+        // Perfect attendance
+        if (data.perfect_attendance && data.perfect_attendance.length > 0) {
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem;">🏆 Perfect Attendance</strong></td></tr>`;
+          html += `<tr><td colspan="6" style="color:#10b981; padding:8px;">
+            ${data.perfect_attendance.map(n => `<span style="background:rgba(16,185,129,0.1); padding:4px 12px; border-radius:8px; margin:4px; display:inline-block; font-weight:600;">${escapeHtml(n)}</span>`).join('')}
+          </td></tr>`;
+        }
+
+        // Concerning absences
+        if (data.concerning_absences && data.concerning_absences.length > 0) {
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem; color:#f43f5e;">⚠️ Concerning Absences (&gt;5 days)</strong></td></tr>`;
+          data.concerning_absences.forEach(emp => {
+            html += `<tr style="background:rgba(244,63,94,0.05);">
+              <td style="font-weight:700; color:#f43f5e;">${escapeHtml(emp.name)}</td>
+              <td>${escapeHtml(emp.department || 'N/A')}</td>
+              <td style="color:#f43f5e; font-weight:700;">${emp.days_absent} days</td>
+              <td colspan="3"></td>
+            </tr>`;
+          });
+        }
+
+        reportHead.innerHTML = '';
+        reportBody.innerHTML = html;
+        count.textContent = `${data.month_name} ${data.year}`;
+      } catch (e) {
+        console.error(e);
+        reportBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#f43f5e;">Failed to load absence report: ${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
   </script>
 </body>
 

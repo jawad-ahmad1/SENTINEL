@@ -1,52 +1,60 @@
-
 /**
- * Professional Kiosk Logic
- * Handles RFID scanning, UI states, and API communication.
- * Refactored to use AUTH helper and /api/v1 endpoints.
+ * Sentinel Kiosk — Professional RFID Attendance Interface
+ * v3.0 — Enhanced with rich scan feedback, live stats, and audio
  */
-
-const API_BASE = window.location.origin && window.location.protocol !== 'file:'
-    ? window.location.origin
-    : 'http://127.0.0.1:8000';
 
 class ProfessionalKiosk {
     constructor() {
         this.config = {
-            apiBase: API_BASE,
+            apiBase: window.location.origin,
             apiUrl: '/api/v1/scan',
-            resetDelay: 3000,
-            debounceTime: 1200
+            resetDelay: 5000,
+            debounceTime: 3000,
+            statsInterval: 30000,
         };
 
-        // mode controls
-        this.currentMode = 'attendance';
-        this.breakState = 'start';
-
-        this.state = { isProcessing: false, lastScan: 0, scanBuffer: '', lastLocalInputTime: 0, lastProcessed: {} };
+        this.state = {
+            isProcessing: false,
+            lastProcessed: {},
+            scanBuffer: '',
+            lastLocalInputTime: 0,
+        };
 
         this.dom = {
             body: document.body,
             input: document.getElementById('rfidInput'),
-            clock: document.getElementById('clock'),
-            date: document.getElementById('date'),
-            feed: document.getElementById('feedList'),
             title: document.getElementById('scanTitle'),
             sub: document.getElementById('scanSubtitle'),
             icon: document.getElementById('scanIcon'),
-            visualizer: document.getElementById('visualizer')
+            clock: document.getElementById('clock'),
+            date: document.getElementById('date'),
+            feed: document.getElementById('feedList'),
+            // Live stats
+            statPresent: document.getElementById('statPresent'),
+            statAbsent: document.getElementById('statAbsent'),
+            statLate: document.getElementById('statLate'),
+            // Scan result overlay
+            overlay: document.getElementById('scanResultOverlay'),
+            resultEmoji: document.getElementById('resultEmoji'),
+            resultName: document.getElementById('resultName'),
+            resultBadge: document.getElementById('resultBadge'),
+            resultTime: document.getElementById('resultTime'),
+            resultHours: document.getElementById('resultHours'),
+            resultLastEvent: document.getElementById('resultLastEvent'),
+            resultLastTime: document.getElementById('resultLastTime'),
+            lateWarning: document.getElementById('lateWarning'),
+            progressFill: document.getElementById('progressFill'),
         };
 
         this.init();
     }
 
     init() {
-        // Prevent browser from restoring previous scroll position on reload
-        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-
+        // Clock
         this.updateTime();
         setInterval(() => this.updateTime(), 1000);
 
-        // Focus Trap and initial load
+        // Focus management
         document.addEventListener('click', () => this.safeFocus());
         if (this.dom.input) this.dom.input.addEventListener('blur', () => setTimeout(() => this.safeFocus(), 50));
 
@@ -69,16 +77,18 @@ class ProfessionalKiosk {
 
         // Initial data load
         this.loadToday();
+        this.loadLiveStats();
+
+        // Refresh live stats every 30 seconds
+        setInterval(() => this.loadLiveStats(), this.config.statsInterval);
 
         this.safeFocus();
     }
 
     handleGlobalKeydown(e) {
-        // Ignore if focus is on an input (like debug tools)
         if (e.target.tagName === 'INPUT' && e.target !== this.dom.input) return;
 
         const now = Date.now();
-        // If regular typing recently occurred, assume manual entry
         if (now - this.state.lastLocalInputTime < 500) return;
 
         if (e.key === 'Enter') {
@@ -89,7 +99,6 @@ class ProfessionalKiosk {
             this.state.scanBuffer = '';
         } else if (e.key.length === 1) {
             this.state.scanBuffer += e.key;
-            // Clear buffer if too long or timeout
             if (this.state.scanBuffer.length > 64) this.state.scanBuffer = '';
             if (!this._bufferTimeout) {
                 this._bufferTimeout = setTimeout(() => {
@@ -103,10 +112,9 @@ class ProfessionalKiosk {
     async processScan(uid, source) {
         if (this.state.isProcessing) return;
 
-        // Dedup: ignore same UID within debounceTime
         const now = Date.now();
         if (this.state.lastProcessed[uid] && (now - this.state.lastProcessed[uid] < this.config.debounceTime)) {
-            return; // ignore
+            return;
         }
 
         this.state.isProcessing = true;
@@ -142,11 +150,26 @@ class ProfessionalKiosk {
     handleSuccess(data) {
         this.emitDebug(`Success: ${data.event} for ${data.name}`);
 
-        const eventLabel = data.event.replace('_', ' ');
-        this.setVisuals('state-success', `Welcome, ${data.name}`, `Recorded: ${eventLabel}`);
+        const isCheckIn = data.event === 'IN';
+        const eventLabel = isCheckIn ? 'CHECKED IN' : 'CHECKED OUT';
 
+        // Update main status
+        this.setVisuals('state-success', `Welcome, ${data.name}`, `Recorded: ${eventLabel}`);
         this.dom.body.classList.remove('processing');
-        this.dom.body.classList.add('state-success'); // Using 'state-success' to match CSS selector .state-success
+
+        // Determine state class
+        const stateClass = data.is_late ? 'state-late' : 'state-success';
+        this.dom.body.classList.add(stateClass);
+
+        // Play audio feedback
+        if (data.is_late) {
+            this.playTone('late');
+        } else {
+            this.playTone('success');
+        }
+
+        // Show rich scan result overlay
+        this.showScanResult(data, isCheckIn, eventLabel);
 
         // Add to feed
         this.addFeedItem({
@@ -157,7 +180,80 @@ class ProfessionalKiosk {
             status: 'success'
         }, true);
 
-        this.resetUI();
+        // Refresh live stats
+        this.loadLiveStats();
+
+        // Reset after delay
+        this.resetUI(stateClass);
+    }
+
+    showScanResult(data, isCheckIn, eventLabel) {
+        if (!this.dom.overlay) return;
+
+        // Emoji
+        if (this.dom.resultEmoji) {
+            this.dom.resultEmoji.textContent = data.is_late ? '⚠️' : (isCheckIn ? '✅' : '👋');
+        }
+
+        // Name
+        if (this.dom.resultName) {
+            this.dom.resultName.textContent = `Welcome, ${data.name}!`;
+        }
+
+        // Badge
+        if (this.dom.resultBadge) {
+            this.dom.resultBadge.textContent = eventLabel;
+            this.dom.resultBadge.className = `result-badge ${isCheckIn ? 'badge-in' : 'badge-out'}`;
+        }
+
+        // Time
+        if (this.dom.resultTime) {
+            this.dom.resultTime.textContent = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        // Today's hours
+        if (this.dom.resultHours) {
+            const hours = data.today_hours || 0;
+            const h = Math.floor(hours);
+            const m = Math.round((hours - h) * 60);
+            this.dom.resultHours.textContent = `${h}h ${m}m`;
+        }
+
+        // Previous event
+        if (this.dom.resultLastEvent) {
+            this.dom.resultLastEvent.textContent = data.last_event_type
+                ? data.last_event_type.replace('_', ' ')
+                : 'First scan';
+        }
+
+        // Previous time
+        if (this.dom.resultLastTime) {
+            if (data.last_event_time) {
+                const lastTime = new Date(data.last_event_time);
+                this.dom.resultLastTime.textContent = isNaN(lastTime.getTime())
+                    ? '—'
+                    : lastTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            } else {
+                this.dom.resultLastTime.textContent = '—';
+            }
+        }
+
+        // Late warning
+        if (this.dom.lateWarning) {
+            this.dom.lateWarning.style.display = data.is_late ? 'block' : 'none';
+        }
+
+        // Restart progress bar animation
+        if (this.dom.progressFill) {
+            this.dom.progressFill.style.animation = 'none';
+            this.dom.progressFill.offsetHeight; // force reflow
+            this.dom.progressFill.style.animation = 'progressCountdown 5s linear forwards';
+        }
+
+        // Show overlay
+        this.dom.overlay.classList.add('active');
     }
 
     handleError(error) {
@@ -167,7 +263,9 @@ class ProfessionalKiosk {
         this.dom.body.classList.remove('processing');
         this.dom.body.classList.add('state-error');
 
-        this.resetUI();
+        this.playTone('error');
+
+        this.resetUI('state-error');
     }
 
     setVisuals(status, title, subtitle) {
@@ -178,13 +276,15 @@ class ProfessionalKiosk {
             if (status === 'state-success') this.dom.icon.textContent = '✅';
             else if (status === 'state-error') this.dom.icon.textContent = '❌';
             else if (status === 'state-processing') this.dom.icon.textContent = '🔄';
+            else if (status === 'state-late') this.dom.icon.textContent = '⚠️';
             else this.dom.icon.textContent = '📡';
         }
     }
 
-    resetUI() {
+    resetUI(stateClass = 'state-success') {
         setTimeout(() => {
-            this.dom.body.classList.remove('processing', 'state-success', 'state-error');
+            this.dom.body.classList.remove('processing', 'state-success', 'state-error', 'state-late');
+            if (this.dom.overlay) this.dom.overlay.classList.remove('active');
             this.setVisuals('idle', 'Ready to Scan', 'Hold your badge near the reader');
             this.state.isProcessing = false;
             if (this.dom.input) this.dom.input.value = '';
@@ -192,6 +292,91 @@ class ProfessionalKiosk {
         }, this.config.resetDelay);
     }
 
+    // ── Audio Feedback (Web Audio API — no external files) ──────────
+    playTone(type) {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            gain.gain.value = 0.15;
+
+            switch (type) {
+                case 'success':
+                    osc.frequency.value = 880;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.3);
+                    // Second tone for pleasant "ding ding"
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.frequency.value = 1100;
+                    osc2.type = 'sine';
+                    gain2.gain.setValueAtTime(0.12, ctx.currentTime + 0.15);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+                    osc2.start(ctx.currentTime + 0.15);
+                    osc2.stop(ctx.currentTime + 0.45);
+                    break;
+
+                case 'error':
+                    osc.frequency.value = 300;
+                    osc.type = 'square';
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.5);
+                    break;
+
+                case 'late':
+                    osc.frequency.value = 660;
+                    osc.type = 'triangle';
+                    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.2);
+                    // Warning second beep
+                    const oscW = ctx.createOscillator();
+                    const gainW = ctx.createGain();
+                    oscW.connect(gainW);
+                    gainW.connect(ctx.destination);
+                    oscW.frequency.value = 440;
+                    oscW.type = 'triangle';
+                    gainW.gain.setValueAtTime(0.12, ctx.currentTime + 0.25);
+                    gainW.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    oscW.start(ctx.currentTime + 0.25);
+                    oscW.stop(ctx.currentTime + 0.5);
+                    break;
+            }
+
+            // Cleanup
+            setTimeout(() => ctx.close(), 1000);
+        } catch (e) {
+            // AudioContext not available — silently skip
+        }
+    }
+
+    // ── Live Stats ────────────────────────────────────────────────
+    async loadLiveStats() {
+        try {
+            const res = await fetch(`${this.config.apiBase}/api/v1/attendance/live-stats`, { credentials: 'include' });
+            if (res.ok) {
+                const stats = await res.json();
+                if (this.dom.statPresent) this.dom.statPresent.textContent = stats.present;
+                if (this.dom.statAbsent) this.dom.statAbsent.textContent = stats.absent;
+                if (this.dom.statLate) this.dom.statLate.textContent = stats.late;
+            }
+        } catch (e) {
+            this.emitDebug(`Live stats failed: ${e.message}`);
+        }
+    }
+
+    // ── Feed ──────────────────────────────────────────────────────
     addFeedItem(item, confirmed) {
         if (!this.dom.feed) return;
 
@@ -202,7 +387,6 @@ class ProfessionalKiosk {
         const timeStr = isNaN(dateObj.getTime()) ? '--:--' : dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const eventLabel = (item.event || 'Unknown').replace('_', ' ').toUpperCase();
 
-        // Initials (safe — derived from name characters)
         const initials = (item.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
         // Build DOM safely (no innerHTML with user data — prevents XSS)
@@ -260,12 +444,6 @@ class ProfessionalKiosk {
                 const data = await res.json();
                 if (this.dom.feed) this.dom.feed.innerHTML = '';
 
-                // Reverse to show newest at top (API usually returns newest first, so we invert?)
-                // Actually the API returns newest first.
-                // If I prepend, I want to prepend the OLDEST first so the NEWEST ends up at the TOP?
-                // No, if list is [New, Old], and I prepend New... List: [New]
-                // Prepend Old... List: [Old, New] -> Top is Old. User sees Oldest.
-                // So I want to prepend in REVERSE order (Oldest -> Newest).
                 const reversed = [...data].reverse();
                 reversed.forEach(r => {
                     this.addFeedItem({

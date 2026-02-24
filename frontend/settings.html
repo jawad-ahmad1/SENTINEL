@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Attendance Settings</title>
+    <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css?v=7">
+    <style>
+        .settings-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            max-width: 700px;
+        }
+
+        .settings-form .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .setting-group {
+            background: var(--glass-bg, rgba(255, 255, 255, 0.03));
+            border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted, rgba(255, 255, 255, 0.5));
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .setting-group input,
+        .setting-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+            font-family: inherit;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .setting-group input:focus,
+        .setting-group select:focus {
+            outline: none;
+            border-color: var(--primary-accent, #6366f1);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .setting-description {
+            font-size: 0.78rem;
+            color: var(--text-muted, rgba(255, 255, 255, 0.4));
+            margin-top: 6px;
+        }
+
+        .settings-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 12px;
+            padding-top: 12px;
+        }
+
+        .save-message {
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            display: none;
+            grid-column: 1 / -1;
+        }
+
+        .save-message.success {
+            display: block;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .save-message.error {
+            display: block;
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #f43f5e;
+        }
+
+        .current-rules {
+            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .current-rule {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .current-rule .rule-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+        }
+
+        .current-rule .rule-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div id="header-container"></div>
+
+        <div class="card animate-enter">
+            <h2 style="margin-bottom: 8px; font-size: 1.3rem;">⚙️ Attendance Rules</h2>
+            <p style="color: var(--text-muted); margin-bottom: 24px; font-size: 0.9rem;">Configure when the workday
+                starts, ends, and the grace period for late arrivals. These rules determine who is marked "late" on the
+                kiosk and dashboard.</p>
+
+            <!-- Current Rules Summary -->
+            <div class="current-rules" id="currentRules">
+                <div class="current-rule">
+                    <span class="rule-label">Work Start</span>
+                    <span class="rule-value" id="currentStart">—</span>
+                </div>
+                <div class="current-rule">
+                    <span class="rule-label">Work End</span>
+                    <span class="rule-value" id="currentEnd">—</span>
+                </div>
+                <div class="current-rule">
+                    <span class="rule-label">Grace Period</span>
+                    <span class="rule-value" id="currentGrace">—</span>
+                </div>
+                <div class="current-rule">
+                    <span class="rule-label">Timezone</span>
+                    <span class="rule-value" id="currentTz">—</span>
+                </div>
+            </div>
+
+            <!-- Settings Form -->
+            <div class="settings-form" id="settingsForm">
+                <div class="setting-group">
+                    <label for="workStart">Work Start Time</label>
+                    <input type="time" id="workStart" value="09:00" />
+                    <div class="setting-description">The exact time the workday begins (24-hour format)</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="workEnd">Work End Time</label>
+                    <input type="time" id="workEnd" value="17:00" />
+                    <div class="setting-description">The exact time the workday ends</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="graceMins">Grace Period (minutes)</label>
+                    <input type="number" id="graceMins" value="15" min="0" max="120" />
+                    <div class="setting-description">Minutes after work start before marking as "late"</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="tzOffset">Timezone Offset</label>
+                    <select id="tzOffset">
+                        <option value="-12:00">UTC-12:00</option>
+                        <option value="-11:00">UTC-11:00</option>
+                        <option value="-10:00">UTC-10:00</option>
+                        <option value="-09:00">UTC-09:00</option>
+                        <option value="-08:00">UTC-08:00 (PST)</option>
+                        <option value="-07:00">UTC-07:00 (MST)</option>
+                        <option value="-06:00">UTC-06:00 (CST)</option>
+                        <option value="-05:00">UTC-05:00 (EST)</option>
+                        <option value="-04:00">UTC-04:00</option>
+                        <option value="-03:00">UTC-03:00</option>
+                        <option value="-02:00">UTC-02:00</option>
+                        <option value="-01:00">UTC-01:00</option>
+                        <option value="+00:00">UTC±00:00 (GMT)</option>
+                        <option value="+01:00">UTC+01:00 (CET)</option>
+                        <option value="+02:00">UTC+02:00</option>
+                        <option value="+03:00">UTC+03:00</option>
+                        <option value="+04:00">UTC+04:00</option>
+                        <option value="+04:30">UTC+04:30</option>
+                        <option value="+05:00" selected>UTC+05:00 (PKT)</option>
+                        <option value="+05:30">UTC+05:30 (IST)</option>
+                        <option value="+05:45">UTC+05:45</option>
+                        <option value="+06:00">UTC+06:00</option>
+                        <option value="+07:00">UTC+07:00</option>
+                        <option value="+08:00">UTC+08:00 (CST)</option>
+                        <option value="+09:00">UTC+09:00 (JST)</option>
+                        <option value="+09:30">UTC+09:30</option>
+                        <option value="+10:00">UTC+10:00 (AEST)</option>
+                        <option value="+11:00">UTC+11:00</option>
+                        <option value="+12:00">UTC+12:00 (NZST)</option>
+                    </select>
+                    <div class="setting-description">Your local timezone for accurate time calculations</div>
+                </div>
+
+                <div class="save-message" id="saveMsg"></div>
+
+                <div class="settings-actions">
+                    <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">💾 Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/auth.js"></script>
+    <script src="js/layout.js"></script>
+    <script>
+        const API_BASE = window.API_BASE || '';
+
+        // Initialize page
+        requireAuth();
+        requireAdmin();
+        Layout.init({
+            active: 'settings',
+            title: 'Attendance Settings',
+            subtitle: 'Configure work hours and attendance rules',
+        });
+
+        // Load current settings on page load
+        loadSettings();
+
+        async function loadSettings() {
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/settings`, { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('workStart').value = data.work_start || '09:00';
+                    document.getElementById('workEnd').value = data.work_end || '17:00';
+                    document.getElementById('graceMins').value = data.grace_minutes ?? 15;
+                    document.getElementById('tzOffset').value = data.timezone_offset || '+05:00';
+
+                    // Update current rules display
+                    document.getElementById('currentStart').textContent = data.work_start || '09:00';
+                    document.getElementById('currentEnd').textContent = data.work_end || '17:00';
+                    document.getElementById('currentGrace').textContent = `${data.grace_minutes ?? 15} min`;
+                    document.getElementById('currentTz').textContent = `UTC${data.timezone_offset || '+05:00'}`;
+                }
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+        }
+
+        async function saveSettings() {
+            const btn = document.getElementById('saveBtn');
+            const msg = document.getElementById('saveMsg');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            msg.className = 'save-message';
+            msg.style.display = 'none';
+
+            try {
+                const body = {
+                    work_start: document.getElementById('workStart').value,
+                    work_end: document.getElementById('workEnd').value,
+                    grace_minutes: parseInt(document.getElementById('graceMins').value) || 15,
+                    timezone_offset: document.getElementById('tzOffset').value,
+                };
+
+                const res = await fetch(`${API_BASE}/api/v1/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(body),
+                });
+
+                if (res.ok) {
+                    msg.textContent = '✅ Settings saved successfully! Changes take effect immediately.';
+                    msg.className = 'save-message success';
+                    loadSettings(); // Refresh display
+                } else {
+                    const err = await res.json();
+                    msg.textContent = `❌ ${err.detail || 'Failed to save settings'}`;
+                    msg.className = 'save-message error';
+                }
+            } catch (e) {
+                msg.textContent = `❌ Network error: ${e.message}`;
+                msg.className = 'save-message error';
+            }
+
+            btn.disabled = false;
+            btn.textContent = '💾 Save Settings';
+        }
+    </script>
+</body>
+
+</html>

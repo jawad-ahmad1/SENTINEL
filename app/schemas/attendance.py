@@ -34,6 +34,10 @@ class ScanResponse(BaseModel):
     name: str
     attendance_id: int
     attendance_timestamp: str
+    today_hours: float = 0.0
+    last_event_type: str | None = None
+    last_event_time: str | None = None
+    is_late: bool = False
 
 
 # ── Break ───────────────────────────────────────────────────────────
@@ -204,6 +208,65 @@ class StatusResponse(BaseModel):
     total_employees: int
     today_scans: int
     status: str
+
+
+# ── Attendance Settings ────────────────────────────────────────────
+class AttendanceSettingsRead(BaseModel):
+    work_start: str
+    work_end: str
+    grace_minutes: int
+    timezone_offset: str
+
+    model_config = {"from_attributes": True}
+
+
+class AttendanceSettingsUpdate(BaseModel):
+    work_start: str | None = None
+    work_end: str | None = None
+    grace_minutes: int | None = None
+    timezone_offset: str | None = None
+
+
+# ── Live Stats ─────────────────────────────────────────────────────
+class LiveStatsResponse(BaseModel):
+    total_employees: int
+    present: int
+    absent: int
+    late: int
+    on_time: int
+    today_scans: int
+
+
+# ── Absence Report ─────────────────────────────────────────────────
+class AbsenceDayDetail(BaseModel):
+    date: str
+    day_name: str
+    expected: int
+    present: int
+    absent: int
+    absence_rate: float
+
+
+class AbsenceEmployeeDetail(BaseModel):
+    employee_id: int
+    name: str
+    department: str | None
+    days_absent: int
+    dates_absent: list[str]
+
+
+class AbsenceReportResponse(BaseModel):
+    year: int
+    month: int
+    month_name: str
+    total_working_days: int
+    total_employees: int
+    total_absences: int
+    absence_rate: float
+    daily_breakdown: list[AbsenceDayDetail]
+    employee_details: list[AbsenceEmployeeDetail]
+    perfect_attendance: list[str]
+    concerning_absences: list[AbsenceEmployeeDetail]
 
 
 # ── Generic ────────────────────────────────────────────────────────

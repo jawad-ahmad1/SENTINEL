@@ -293,7 +293,10 @@
 
       try {
         const res = await AUTH.fetch(`${API}/api/v1/reports/absence/${year}/${month}`);
-        if (!res.ok) throw new Error('Failed to load absence report');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server returned ${res.status}`);
+        }
         const data = await res.json();
 
         // Build a rich absence report in the table area
@@ -323,7 +326,7 @@
 
         // Daily breakdown table
         if (data.daily_breakdown && data.daily_breakdown.length > 0) {
-          html += `<tr><td colspan="6" style="padding:8px 0;"><strong style="font-size:1rem;">📅 Daily Breakdown</strong></td></tr>`;
+          html += `<tr><td colspan="6" style="padding:8px 0;"><strong style="font-size:1rem;">Daily Breakdown</strong></td></tr>`;
           html += '<tr><th>Date</th><th>Day</th><th>Expected</th><th>Present</th><th>Absent</th><th>Absence %</th></tr>';
           data.daily_breakdown.forEach(d => {
             const rowColor = d.absence_rate > 20 ? 'color:#f43f5e;' : '';
@@ -338,25 +341,52 @@
           });
         }
 
-        // Employee details
+        // Employee details — compact with filter dropdown
         if (data.employee_details && data.employee_details.length > 0) {
-          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem;">👤 Employee Absence Details</strong></td></tr>`;
-          html += '<tr><th>Name</th><th>Department</th><th>Days Absent</th><th colspan="3">Dates</th></tr>';
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+              <strong style="font-size:1rem;">Employee Absence Details</strong>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label style="font-size:0.75rem; color:rgba(255,255,255,0.4); text-transform:uppercase; font-weight:600;">Filter</label>
+                <select id="empAbsenceFilter" onchange="filterAbsenceEmployee(this.value)" style="padding:5px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); background:#1a1a2e; color:#fff; font-size:0.85rem; font-family:inherit;">
+                  <option value="all" style="background:#1a1a2e;color:#fff">All Employees</option>
+                  ${data.employee_details.map(e => `<option value="${e.employee_id}" style="background:#1a1a2e;color:#fff">${escapeHtml(e.name)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </td></tr>`;
+
+          html += '<tr><th>Employee</th><th>Dept</th><th>Absent</th><th>Leave</th><th>Half-Day</th><th>Status & Actions</th></tr>';
+
           data.employee_details.forEach(emp => {
-            const datesStr = emp.dates_absent.slice(0, 5).join(', ') + (emp.dates_absent.length > 5 ? ` +${emp.dates_absent.length - 5} more` : '');
-            const style = emp.days_absent > 5 ? 'color:#f43f5e; font-weight:700;' : '';
-            html += `<tr>
+            // Build status summary badges
+            let statusBadges = '';
+            const statusCounts = {};
+            emp.dates_absent.forEach(dt => {
+              const s = (emp.overrides && emp.overrides[dt]) || 'ABSENT';
+              statusCounts[s] = (statusCounts[s] || 0) + 1;
+            });
+            Object.entries(statusCounts).forEach(([s, c]) => {
+              statusBadges += `<span style="background:${getStatusColor(s)}; padding:2px 6px; border-radius:4px; font-size:0.65rem; font-weight:600; text-transform:uppercase;">${formatStatus(s)} (${c})</span>`;
+            });
+
+            html += `<tr class="emp-absence-row" data-emp-id="${emp.employee_id}">
               <td style="font-weight:600;">${escapeHtml(emp.name)}</td>
-              <td>${escapeHtml(emp.department || 'N/A')}</td>
-              <td style="${style}">${emp.days_absent}</td>
-              <td colspan="3" style="font-size:0.85rem; color:rgba(255,255,255,0.5);">${escapeHtml(datesStr)}</td>
+              <td style="font-size:0.85rem; color:rgba(255,255,255,0.5);">${escapeHtml(emp.department || 'N/A')}</td>
+              <td style="font-weight:700; color:#f43f5e;">${emp.days_absent}</td>
+              <td style="font-weight:700; color:#f59e0b;">${emp.days_leave}</td>
+              <td style="font-weight:700; color:#10b981;">${emp.days_half_day}</td>
+              <td>
+                <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">${statusBadges}</div>
+                <a href="#" onclick="loadEmployeeAbsence(${emp.employee_id}); return false;" style="color:#818cf8; text-decoration:none; font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Manage</a>
+              </td>
             </tr>`;
           });
         }
 
         // Perfect attendance
         if (data.perfect_attendance && data.perfect_attendance.length > 0) {
-          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem;">🏆 Perfect Attendance</strong></td></tr>`;
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem;">Perfect Attendance</strong></td></tr>`;
           html += `<tr><td colspan="6" style="color:#10b981; padding:8px;">
             ${data.perfect_attendance.map(n => `<span style="background:rgba(16,185,129,0.1); padding:4px 12px; border-radius:8px; margin:4px; display:inline-block; font-weight:600;">${escapeHtml(n)}</span>`).join('')}
           </td></tr>`;
@@ -364,13 +394,16 @@
 
         // Concerning absences
         if (data.concerning_absences && data.concerning_absences.length > 0) {
-          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem; color:#f43f5e;">⚠️ Concerning Absences (&gt;5 days)</strong></td></tr>`;
+          html += `<tr><td colspan="6" style="padding:20px 0 8px;"><strong style="font-size:1rem; color:#f43f5e;">Concerning Absences (Over Limits)</strong></td></tr>`;
+          html += '<tr style="background:rgba(244,63,94,0.1);"><th>Employee</th><th>Dept</th><th>Absent</th><th>Leave</th><th>Half-Day</th><th></th></tr>';
           data.concerning_absences.forEach(emp => {
-            html += `<tr style="background:rgba(244,63,94,0.05);">
+            html += `<tr style="background:rgba(244,63,94,0.02);">
               <td style="font-weight:700; color:#f43f5e;">${escapeHtml(emp.name)}</td>
               <td>${escapeHtml(emp.department || 'N/A')}</td>
-              <td style="color:#f43f5e; font-weight:700;">${emp.days_absent} days</td>
-              <td colspan="3"></td>
+              <td style="color:#f43f5e; font-weight:700;">${emp.days_absent}</td>
+              <td style="color:#f59e0b; font-weight:700;">${emp.days_leave}</td>
+              <td style="color:#10b981; font-weight:700;">${emp.days_half_day}</td>
+              <td></td>
             </tr>`;
           });
         }
@@ -381,6 +414,160 @@
       } catch (e) {
         console.error(e);
         reportBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#f43f5e;">Failed to load absence report: ${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+
+    // Status color mapping
+    function getStatusColor(status) {
+      const colors = {
+        'ABSENT': 'rgba(244,63,94,0.2)',
+        'LEAVE': 'rgba(16,185,129,0.2)',
+        'WORK_FROM_HOME': 'rgba(59,130,246,0.2)',
+        'BUSINESS_TRIP': 'rgba(245,158,11,0.2)',
+        'HALF_DAY': 'rgba(168,85,247,0.2)',
+        'SUPPLIER_VISIT': 'rgba(20,184,166,0.2)',
+      };
+      return colors[status] || colors['ABSENT'];
+    }
+
+    function formatStatus(status) {
+      const labels = {
+        'ABSENT': 'Absent',
+        'LEAVE': 'Leave',
+        'WORK_FROM_HOME': 'WFH',
+        'BUSINESS_TRIP': 'Business Trip',
+        'HALF_DAY': 'Half Day',
+        'SUPPLIER_VISIT': 'Supplier Visit',
+      };
+      return labels[status] || status;
+    }
+
+    let _currentDrilldownEmpId = null; // Track if we're in drill-down view
+
+    // Set override via API
+    async function setOverride(employeeId, dateStr, status) {
+      if (!status) return;
+      try {
+        const res = await AUTH.fetch(`${API}/api/v1/attendance/absence-override`, {
+          method: 'POST',
+          body: JSON.stringify({ employee_id: employeeId, date: dateStr, status: status }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.detail || 'Failed to set override');
+          return;
+        }
+        // Stay in current view — reload drill-down if active, else overview
+        if (_currentDrilldownEmpId) {
+          loadEmployeeAbsence(_currentDrilldownEmpId);
+        } else {
+          loadAbsence(monthInput.value);
+        }
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      }
+    }
+
+    // Filter employee absence rows by dropdown
+    function filterAbsenceEmployee(empId) {
+      if (empId === 'all') {
+        document.querySelectorAll('.emp-absence-row').forEach(r => r.style.display = '');
+      } else {
+        document.querySelectorAll('.emp-absence-row').forEach(r => {
+          r.style.display = r.dataset.empId === empId ? '' : 'none';
+        });
+      }
+    }
+
+    // Per-employee drill-down
+    async function loadEmployeeAbsence(employeeId) {
+      _currentDrilldownEmpId = employeeId; // Track active drill-down
+      const monthStr = monthInput.value || new Date().toISOString().slice(0, 7);
+      const [year, month] = monthStr.split('-').map(Number);
+
+      reportHead.innerHTML = '';
+      reportBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">Loading employee details...</td></tr>';
+
+      try {
+        const res = await AUTH.fetch(`${API}/api/v1/reports/absence/${year}/${month}/employee/${employeeId}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Server returned ${res.status}`);
+        }
+        const data = await res.json();
+
+        let html = '';
+        html += `<tr><td colspan="6" style="padding:0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0; font-size:1.2rem;">${escapeHtml(data.name)}</h3>
+              <span style="color:rgba(255,255,255,0.4); font-size:0.85rem;">${escapeHtml(data.department || 'No Department')} | ${data.month_name} ${data.year}</span>
+            </div>
+            <a href="#" onclick="_currentDrilldownEmpId=null; loadAbsence(monthInput.value); return false;" style="color:#818cf8; text-decoration:none; font-size:0.85rem;">Back to Overview</a>
+          </div>
+        </td></tr>`;
+
+        html += `<tr><td colspan="6" style="padding:0;">
+          <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:20px;">
+            <div style="background:rgba(99,102,241,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Work Days</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#818cf8;">${data.working_days}</div>
+            </div>
+            <div style="background:rgba(16,185,129,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Present</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#10b981;">${data.days_present}</div>
+            </div>
+            <div style="background:rgba(244,63,94,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Absent</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#f43f5e;">${data.days_absent}</div>
+            </div>
+            <div style="background:rgba(245,158,11,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Leave</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#f59e0b;">${data.days_leave}</div>
+            </div>
+            <div style="background:rgba(16,185,129,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Half Day</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#10b981;">${data.days_half_day}</div>
+            </div>
+            <div style="background:rgba(59,130,246,0.08); border-radius:12px; padding:14px; text-align:center;">
+              <div style="font-size:0.6rem; text-transform:uppercase; color:rgba(255,255,255,0.4); font-weight:600;">Rate</div>
+              <div style="font-size:1.3rem; font-weight:800; color:#3b82f6;">${data.attendance_rate}%</div>
+            </div>
+          </div>
+        </td></tr>`;
+
+        if (data.dates_absent.length > 0) {
+          html += '<tr><th>Date</th><th>Day</th><th>Current Status</th><th>Set Status</th><th colspan="2"></th></tr>';
+          data.dates_absent.forEach(dt => {
+            const status = (data.overrides && data.overrides[dt]) || 'ABSENT';
+            const statusColor = getStatusColor(status);
+            html += `<tr>
+              <td style="font-weight:600;">${escapeHtml(dt)}</td>
+              <td style="color:rgba(255,255,255,0.4);">${new Date(dt + 'T00:00:00').toLocaleDateString('en', { weekday: 'long' })}</td>
+              <td><span style="background:${statusColor}; padding:2px 10px; border-radius:6px; font-size:0.75rem; font-weight:600; text-transform:uppercase;">${formatStatus(status)}</span></td>
+              <td>
+                <select onchange="setOverride(${data.employee_id}, '${dt}', this.value)" style="padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-size:0.8rem; font-family:inherit;">
+                  <option value="" style="background:#1a1a2e;color:#fff" ${status === 'ABSENT' ? 'selected' : ''}>-- Absent --</option>
+                  <option value="LEAVE" style="background:#1a1a2e;color:#fff" ${status === 'LEAVE' ? 'selected' : ''}>Leave</option>
+                  <option value="WORK_FROM_HOME" style="background:#1a1a2e;color:#fff" ${status === 'WORK_FROM_HOME' ? 'selected' : ''}>Work From Home</option>
+                  <option value="BUSINESS_TRIP" style="background:#1a1a2e;color:#fff" ${status === 'BUSINESS_TRIP' ? 'selected' : ''}>Business Trip</option>
+                  <option value="HALF_DAY" style="background:#1a1a2e;color:#fff" ${status === 'HALF_DAY' ? 'selected' : ''}>Half Day</option>
+                  <option value="SUPPLIER_VISIT" style="background:#1a1a2e;color:#fff" ${status === 'SUPPLIER_VISIT' ? 'selected' : ''}>Supplier Visit</option>
+                </select>
+              </td>
+              <td colspan="2"></td>
+            </tr>`;
+          });
+        } else {
+          html += '<tr><td colspan="6" style="text-align:center; padding:20px; color:#10b981;">No absences this month. Perfect attendance.</td></tr>';
+        }
+
+        reportHead.innerHTML = '';
+        reportBody.innerHTML = html;
+        count.textContent = `${data.name}`;
+      } catch (e) {
+        console.error(e);
+        reportBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:#f43f5e;">Failed to load: ${escapeHtml(e.message)}</td></tr>`;
       }
     }
   </script>

@@ -61,6 +61,56 @@
         </a>
       </div>
     </div>
+    <!-- Data Management -->
+    <div class="panel animate-enter delay-150" style="padding: 20px;">
+      <div class="panel-title" style="margin-bottom: 20px;">Data Management</div>
+
+      <div
+        style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px;">
+        <p
+          style="color:var(--text-muted); margin-bottom:16px; font-size:0.85rem; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+          <span>Clear attendance records. This is permanent and cannot be undone.</span>
+          <label
+            style="display:flex; align-items:center; gap:6px; color:#f43f5e; font-weight:600; font-size:0.8rem; cursor:pointer;">
+            <input type="checkbox" id="clearConfirm"> I understand this is permanent
+          </label>
+        </p>
+
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <select id="clearScope"
+            style="padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-size:0.85rem; font-family:inherit; min-width:140px;"
+            onchange="toggleClearInputs()">
+            <option value="all" style="background:#1a1a2e;color:#fff">All Records</option>
+            <option value="date" style="background:#1a1a2e;color:#fff">Specific Date</option>
+            <option value="range" style="background:#1a1a2e;color:#fff">Date Range</option>
+            <option value="employee" style="background:#1a1a2e;color:#fff">By Employee</option>
+          </select>
+
+          <div id="clearDateWrap" style="display:none;">
+            <input type="date" id="clearDate"
+              style="padding:7px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-family:inherit; color-scheme:dark;">
+          </div>
+
+          <div id="clearRangeWrap" style="display:none; align-items:center; gap:8px;">
+            <input type="date" id="clearFrom"
+              style="padding:7px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-family:inherit; color-scheme:dark;">
+            <span style="color:rgba(255,255,255,0.3); font-size:0.8rem;">to</span>
+            <input type="date" id="clearTo"
+              style="padding:7px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-family:inherit; color-scheme:dark;">
+          </div>
+
+          <div id="clearEmpWrap" style="display:none;">
+            <input type="number" id="clearEmpId" placeholder="Employee ID"
+              style="padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#1a1a2e; color:#fff; font-family:inherit; width:120px;">
+          </div>
+
+          <button class="btn" id="clearBtn" onclick="clearRecords()"
+            style="background:#f43f5e; color:#fff; padding:8px 20px; font-size:0.85rem; margin-left:auto;">Clear
+            Records</button>
+        </div>
+      </div>
+      <div id="clearMsg" style="margin-top:12px; display:none; font-size:0.85rem; text-align:right;"></div>
+    </div>
 
     <!-- System Health -->
     <div class="panel animate-enter delay-200">
@@ -253,6 +303,73 @@
         if (tbody && tbody.innerHTML.includes('Loading')) {
           tbody.innerHTML = '<tr><td colspan="4" style="color:var(--error-accent)">Failed to load activity.</td></tr>';
         }
+      }
+    }
+
+    // ── Clear Records ─────────────────────────────────────────
+    function toggleClearInputs() {
+      const scope = document.getElementById('clearScope').value;
+      document.getElementById('clearDateWrap').style.display = scope === 'date' ? 'block' : 'none';
+
+      const rangeWrap = document.getElementById('clearRangeWrap');
+      if (scope === 'range') {
+        rangeWrap.style.display = 'flex';
+      } else {
+        rangeWrap.style.display = 'none';
+      }
+
+      document.getElementById('clearEmpWrap').style.display = scope === 'employee' ? 'block' : 'none';
+    }
+
+    async function clearRecords() {
+      const confirm = document.getElementById('clearConfirm');
+      const msg = document.getElementById('clearMsg');
+      if (!confirm.checked) {
+        msg.style.display = 'block';
+        msg.style.color = '#f59e0b';
+        msg.textContent = 'Please check the confirmation box first.';
+        return;
+      }
+
+      const scope = document.getElementById('clearScope').value;
+      let params = `scope=${scope}`;
+
+      if (scope === 'date') {
+        const d = document.getElementById('clearDate').value;
+        if (!d) { msg.style.display = 'block'; msg.style.color = '#f43f5e'; msg.textContent = 'Please select a date.'; return; }
+        params += `&date_str=${d}`;
+      } else if (scope === 'range') {
+        const f = document.getElementById('clearFrom').value;
+        const t = document.getElementById('clearTo').value;
+        if (!f || !t) { msg.style.display = 'block'; msg.style.color = '#f43f5e'; msg.textContent = 'Please select both dates.'; return; }
+        params += `&date_from=${f}&date_to=${t}`;
+      } else if (scope === 'employee') {
+        const eid = document.getElementById('clearEmpId').value;
+        if (!eid) { msg.style.display = 'block'; msg.style.color = '#f43f5e'; msg.textContent = 'Please enter an Employee ID.'; return; }
+        params += `&employee_id=${eid}`;
+      }
+
+      const scopeLabel = scope === 'all' ? 'ALL attendance records' : `records (${scope})`;
+      if (!window.confirm(`WARNING: This will permanently delete ${scopeLabel}. Continue?`)) return;
+
+      try {
+        const res = await AUTH.fetch(`${API_BASE}/api/v1/attendance/clear?${params}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          msg.style.display = 'block';
+          msg.style.color = '#10b981';
+          msg.textContent = `Successfully deleted ${data.deleted} record(s).`;
+          confirm.checked = false;
+          loadDashboard(); // Refresh stats
+        } else {
+          msg.style.display = 'block';
+          msg.style.color = '#f43f5e';
+          msg.textContent = `${data.detail || 'Failed to clear records'}`;
+        }
+      } catch (e) {
+        msg.style.display = 'block';
+        msg.style.color = '#f43f5e';
+        msg.textContent = `Network error: ${e.message}`;
       }
     }
   </script>

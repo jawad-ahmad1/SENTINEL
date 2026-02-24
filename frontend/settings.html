@@ -59,6 +59,11 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }
 
+        .setting-group select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
         .setting-description {
             font-size: 0.78rem;
             color: var(--text-muted, rgba(255, 255, 255, 0.4));
@@ -135,7 +140,7 @@
         <div id="header-container"></div>
 
         <div class="card animate-enter">
-            <h2 style="margin-bottom: 8px; font-size: 1.3rem;">⚙️ Attendance Rules</h2>
+            <h2 style="margin-bottom: 8px; font-size: 1.3rem;">Attendance Rules</h2>
             <p style="color: var(--text-muted); margin-bottom: 24px; font-size: 0.9rem;">Configure when the workday
                 starts, ends, and the grace period for late arrivals. These rules determine who is marked "late" on the
                 kiosk and dashboard.</p>
@@ -158,6 +163,18 @@
                     <span class="rule-label">Timezone</span>
                     <span class="rule-value" id="currentTz">—</span>
                 </div>
+                <div class="current-rule">
+                    <span class="rule-label">Allowed Absences</span>
+                    <span class="rule-value" id="currentAbsences">—</span>
+                </div>
+                <div class="current-rule">
+                    <span class="rule-label">Allowed Leaves</span>
+                    <span class="rule-value" id="currentLeaves">—</span>
+                </div>
+                <div class="current-rule">
+                    <span class="rule-label">Allowed Half Days</span>
+                    <span class="rule-value" id="currentHalfDays">—</span>
+                </div>
             </div>
 
             <!-- Settings Form -->
@@ -178,6 +195,25 @@
                     <label for="graceMins">Grace Period (minutes)</label>
                     <input type="number" id="graceMins" value="15" min="0" max="120" />
                     <div class="setting-description">Minutes after work start before marking as "late"</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="allowedAbsent">Allowed Absences (Days)</label>
+                    <input type="number" id="allowedAbsent" value="5" min="0" max="365" />
+                    <div class="setting-description">Number of regular absences an employee is allowed per month/year
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="allowedLeave">Allowed Leaves (Days)</label>
+                    <input type="number" id="allowedLeave" value="10" min="0" max="365" />
+                    <div class="setting-description">Number of approved leaves allowed (e.g. sick, casual)</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="allowedHalfDay">Allowed Half Days</label>
+                    <input type="number" id="allowedHalfDay" value="5" min="0" max="365" />
+                    <div class="setting-description">Number of permitted half-day attendances</div>
                 </div>
 
                 <div class="setting-group">
@@ -219,7 +255,7 @@
                 <div class="save-message" id="saveMsg"></div>
 
                 <div class="settings-actions">
-                    <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">💾 Save Settings</button>
+                    <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">Save Settings</button>
                 </div>
             </div>
         </div>
@@ -230,17 +266,20 @@
     <script>
         const API_BASE = window.API_BASE || '';
 
-        // Initialize page
-        requireAuth();
-        requireAdmin();
+        // Initialize layout immediately so sidebar renders
         Layout.init({
             active: 'settings',
             title: 'Attendance Settings',
             subtitle: 'Configure work hours and attendance rules',
         });
 
-        // Load current settings on page load
-        loadSettings();
+        // Server-side admin guard
+        (async () => {
+            const user = await AUTH.requireAdmin();
+            if (!user) return;
+            AUTH.initInactivityTimeout();
+            loadSettings();
+        })();
 
         async function loadSettings() {
             try {
@@ -250,6 +289,9 @@
                     document.getElementById('workStart').value = data.work_start || '09:00';
                     document.getElementById('workEnd').value = data.work_end || '17:00';
                     document.getElementById('graceMins').value = data.grace_minutes ?? 15;
+                    document.getElementById('allowedAbsent').value = data.allowed_absent ?? 5;
+                    document.getElementById('allowedLeave').value = data.allowed_leave ?? 10;
+                    document.getElementById('allowedHalfDay').value = data.allowed_half_day ?? 5;
                     document.getElementById('tzOffset').value = data.timezone_offset || '+05:00';
 
                     // Update current rules display
@@ -257,6 +299,9 @@
                     document.getElementById('currentEnd').textContent = data.work_end || '17:00';
                     document.getElementById('currentGrace').textContent = `${data.grace_minutes ?? 15} min`;
                     document.getElementById('currentTz').textContent = `UTC${data.timezone_offset || '+05:00'}`;
+                    document.getElementById('currentAbsences').textContent = `${data.allowed_absent ?? 5} days`;
+                    document.getElementById('currentLeaves').textContent = `${data.allowed_leave ?? 10} days`;
+                    document.getElementById('currentHalfDays').textContent = `${data.allowed_half_day ?? 5} days`;
                 }
             } catch (e) {
                 console.error('Failed to load settings:', e);
@@ -276,6 +321,9 @@
                     work_start: document.getElementById('workStart').value,
                     work_end: document.getElementById('workEnd').value,
                     grace_minutes: parseInt(document.getElementById('graceMins').value) || 15,
+                    allowed_absent: parseInt(document.getElementById('allowedAbsent').value) || 5,
+                    allowed_leave: parseInt(document.getElementById('allowedLeave').value) || 10,
+                    allowed_half_day: parseInt(document.getElementById('allowedHalfDay').value) || 5,
                     timezone_offset: document.getElementById('tzOffset').value,
                 };
 
@@ -287,21 +335,21 @@
                 });
 
                 if (res.ok) {
-                    msg.textContent = '✅ Settings saved successfully! Changes take effect immediately.';
+                    msg.textContent = 'Settings saved successfully. Changes take effect immediately.';
                     msg.className = 'save-message success';
                     loadSettings(); // Refresh display
                 } else {
                     const err = await res.json();
-                    msg.textContent = `❌ ${err.detail || 'Failed to save settings'}`;
+                    msg.textContent = `${err.detail || 'Failed to save settings'}`;
                     msg.className = 'save-message error';
                 }
             } catch (e) {
-                msg.textContent = `❌ Network error: ${e.message}`;
+                msg.textContent = `Network error: ${e.message}`;
                 msg.className = 'save-message error';
             }
 
             btn.disabled = false;
-            btn.textContent = '💾 Save Settings';
+            btn.textContent = 'Save Settings';
         }
     </script>
 </body>

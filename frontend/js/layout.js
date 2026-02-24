@@ -47,11 +47,11 @@ const Layout = {
         if (!sidebarContainer) return;
 
         const menuItems = [
-            { id: 'dashboard', label: 'Dashboard', href: 'admin.html', icon: '📊' },
-            { id: 'employees', label: 'Employees', href: 'employees.html', icon: '👥' },
-            { id: 'reports', label: 'Reports', href: 'reports.html', icon: '📈' },
-            { id: 'register', label: 'Register New', href: 'register.html', icon: '✨' },
-            { id: 'settings', label: 'Settings', href: 'settings.html', icon: '⚙️' },
+            { id: 'dashboard', label: 'Dashboard', href: 'admin.html', icon: '' },
+            { id: 'employees', label: 'Employees', href: 'employees.html', icon: '' },
+            { id: 'reports', label: 'Reports', href: 'reports.html', icon: '' },
+            { id: 'register', label: 'Register New', href: 'register.html', icon: '' },
+            { id: 'settings', label: 'Settings', href: 'settings.html', icon: '' },
         ];
 
         const generateNav = () => menuItems.map(item => {

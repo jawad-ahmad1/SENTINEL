@@ -215,6 +215,9 @@ class AttendanceSettingsRead(BaseModel):
     work_start: str
     work_end: str
     grace_minutes: int
+    allowed_absent: int
+    allowed_leave: int
+    allowed_half_day: int
     timezone_offset: str
 
     model_config = {"from_attributes": True}
@@ -224,6 +227,9 @@ class AttendanceSettingsUpdate(BaseModel):
     work_start: str | None = None
     work_end: str | None = None
     grace_minutes: int | None = None
+    allowed_absent: int | None = None
+    allowed_leave: int | None = None
+    allowed_half_day: int | None = None
     timezone_offset: str | None = None
 
 
@@ -251,8 +257,11 @@ class AbsenceEmployeeDetail(BaseModel):
     employee_id: int
     name: str
     department: str | None
-    days_absent: int
+    days_absent: float
+    days_leave: float
+    days_half_day: float
     dates_absent: list[str]
+    overrides: dict[str, str] = {}  # date -> status (LEAVE, WFH, etc.)
 
 
 class AbsenceReportResponse(BaseModel):
@@ -261,12 +270,53 @@ class AbsenceReportResponse(BaseModel):
     month_name: str
     total_working_days: int
     total_employees: int
-    total_absences: int
+    total_absences: float
     absence_rate: float
     daily_breakdown: list[AbsenceDayDetail]
     employee_details: list[AbsenceEmployeeDetail]
     perfect_attendance: list[str]
     concerning_absences: list[AbsenceEmployeeDetail]
+
+
+# ── Absence Overrides ──────────────────────────────────────────────
+VALID_OVERRIDE_STATUSES = [
+    "LEAVE", "BUSINESS_TRIP", "WORK_FROM_HOME", "HALF_DAY", "SUPPLIER_VISIT",
+]
+
+
+class AbsenceOverrideCreate(BaseModel):
+    employee_id: int
+    date: str  # YYYY-MM-DD
+    status: str  # Must be in VALID_OVERRIDE_STATUSES
+    notes: str | None = None
+
+
+class AbsenceOverrideRead(BaseModel):
+    id: int
+    employee_id: int
+    employee_name: str | None = None
+    date: str
+    status: str
+    notes: str | None
+    created_by: int
+    created_at: str | None = None
+
+
+class EmployeeMonthAbsence(BaseModel):
+    employee_id: int
+    name: str
+    department: str | None
+    year: int
+    month: int
+    month_name: str
+    working_days: int
+    days_present: float
+    days_absent: float
+    days_leave: float
+    days_half_day: float
+    dates_absent: list[str]
+    overrides: dict[str, str]  # date -> status
+    attendance_rate: float
 
 
 # ── Generic ────────────────────────────────────────────────────────

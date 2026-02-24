@@ -158,18 +158,20 @@ class ProfessionalKiosk {
         this.dom.body.classList.remove('processing');
 
         // Determine state class
-        const stateClass = data.is_late ? 'state-late' : 'state-success';
+        const stateClass = data.is_late
+            ? (isCheckIn ? 'state-late' : 'state-early-out')
+            : 'state-success';
         this.dom.body.classList.add(stateClass);
 
-        // Play audio feedback
-        if (data.is_late) {
-            this.playTone('late');
-        } else {
-            this.playTone('success');
+        // If late arrival or early checkout, update subtitle
+        if (data.is_late && isCheckIn) {
+            this.setVisuals('state-late', `Welcome, ${data.name}`, 'Late Arrival');
+        } else if (data.is_late && !isCheckIn) {
+            this.setVisuals('state-success', `${data.name}`, 'Early Check Out');
         }
 
-        // Show rich scan result overlay
-        this.showScanResult(data, isCheckIn, eventLabel);
+        // Play audio feedback
+        this.playTone(data.is_late ? 'late' : 'success');
 
         // Add to feed
         this.addFeedItem({
@@ -180,80 +182,8 @@ class ProfessionalKiosk {
             status: 'success'
         }, true);
 
-        // Refresh live stats
-        this.loadLiveStats();
-
         // Reset after delay
         this.resetUI(stateClass);
-    }
-
-    showScanResult(data, isCheckIn, eventLabel) {
-        if (!this.dom.overlay) return;
-
-        // Emoji
-        if (this.dom.resultEmoji) {
-            this.dom.resultEmoji.textContent = data.is_late ? '⚠️' : (isCheckIn ? '✅' : '👋');
-        }
-
-        // Name
-        if (this.dom.resultName) {
-            this.dom.resultName.textContent = `Welcome, ${data.name}!`;
-        }
-
-        // Badge
-        if (this.dom.resultBadge) {
-            this.dom.resultBadge.textContent = eventLabel;
-            this.dom.resultBadge.className = `result-badge ${isCheckIn ? 'badge-in' : 'badge-out'}`;
-        }
-
-        // Time
-        if (this.dom.resultTime) {
-            this.dom.resultTime.textContent = new Date().toLocaleTimeString('en-US', {
-                hour: '2-digit', minute: '2-digit'
-            });
-        }
-
-        // Today's hours
-        if (this.dom.resultHours) {
-            const hours = data.today_hours || 0;
-            const h = Math.floor(hours);
-            const m = Math.round((hours - h) * 60);
-            this.dom.resultHours.textContent = `${h}h ${m}m`;
-        }
-
-        // Previous event
-        if (this.dom.resultLastEvent) {
-            this.dom.resultLastEvent.textContent = data.last_event_type
-                ? data.last_event_type.replace('_', ' ')
-                : 'First scan';
-        }
-
-        // Previous time
-        if (this.dom.resultLastTime) {
-            if (data.last_event_time) {
-                const lastTime = new Date(data.last_event_time);
-                this.dom.resultLastTime.textContent = isNaN(lastTime.getTime())
-                    ? '—'
-                    : lastTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            } else {
-                this.dom.resultLastTime.textContent = '—';
-            }
-        }
-
-        // Late warning
-        if (this.dom.lateWarning) {
-            this.dom.lateWarning.style.display = data.is_late ? 'block' : 'none';
-        }
-
-        // Restart progress bar animation
-        if (this.dom.progressFill) {
-            this.dom.progressFill.style.animation = 'none';
-            this.dom.progressFill.offsetHeight; // force reflow
-            this.dom.progressFill.style.animation = 'progressCountdown 5s linear forwards';
-        }
-
-        // Show overlay
-        this.dom.overlay.classList.add('active');
     }
 
     handleError(error) {
@@ -273,18 +203,23 @@ class ProfessionalKiosk {
         if (this.dom.sub) this.dom.sub.textContent = subtitle;
 
         if (this.dom.icon) {
-            if (status === 'state-success') this.dom.icon.textContent = '✅';
-            else if (status === 'state-error') this.dom.icon.textContent = '❌';
-            else if (status === 'state-processing') this.dom.icon.textContent = '🔄';
-            else if (status === 'state-late') this.dom.icon.textContent = '⚠️';
-            else this.dom.icon.textContent = '📡';
+            if (status === 'state-success') {
+                this.dom.icon.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+            } else if (status === 'state-error') {
+                this.dom.icon.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            } else if (status === 'state-processing') {
+                this.dom.icon.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+            } else if (status === 'state-late') {
+                this.dom.icon.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            } else {
+                this.dom.icon.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 12a7 7 0 0 1 7-7c2.8 0 5.2 1.6 6.3 4"/><path d="M8.5 12a3.5 3.5 0 0 1 3.5-3.5"/><circle cx="12" cy="12" r="1"/><path d="M12 13v9"/></svg>';
+            }
         }
     }
 
     resetUI(stateClass = 'state-success') {
         setTimeout(() => {
-            this.dom.body.classList.remove('processing', 'state-success', 'state-error', 'state-late');
-            if (this.dom.overlay) this.dom.overlay.classList.remove('active');
+            this.dom.body.classList.remove('processing', 'state-success', 'state-error', 'state-late', 'state-early-out');
             this.setVisuals('idle', 'Ready to Scan', 'Hold your badge near the reader');
             this.state.isProcessing = false;
             if (this.dom.input) this.dom.input.value = '';

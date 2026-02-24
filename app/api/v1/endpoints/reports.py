@@ -14,27 +14,32 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 
-from app.api.v1.deps import get_current_active_user, get_db
+from app.api.v1.deps import get_current_active_user, get_db, require_admin
+from app.models.absence_override import AbsenceOverride
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
 from app.schemas.attendance import (
     AbsenceDayDetail,
     AbsenceEmployeeDetail,
+    AbsenceOverrideCreate,
+    AbsenceOverrideRead,
     AbsenceReportResponse,
     AttendanceFeedItem,
     DailySummaryResponse,
     EmployeeAnalyticsResponse,
+    EmployeeMonthAbsence,
     HealthResponse,
     LiveStatsResponse,
     MonthlyReportResponse,
     StatusResponse,
     TrendsResponse,
+    VALID_OVERRIDE_STATUSES,
 )
 
 router = APIRouter(tags=["reports"])
@@ -186,21 +191,28 @@ async def daily_csv(
         by_emp[att.employee_id].append(att)
         names[att.employee_id] = name
 
+    def _fmt_time(ts):
+        """Format a timestamp to readable HH:MM AM/PM."""
+        if ts is None:
+            return ""
+        return ts.strftime("%I:%M %p")
+
     def iter_csv():
         yield "employee_id,name,date,first_in,last_out,work_hours\n"
         for emp_id, events in by_emp.items():
-            first_in = next(
-                (e.timestamp.isoformat() for e in events if e.event_type == "IN"), ""
+            first_in_ts = next(
+                (e.timestamp for e in events if e.event_type == "IN"), None
             )
-            last_out = next(
+            last_out_ts = next(
                 (
-                    e.timestamp.isoformat()
+                    e.timestamp
                     for e in reversed(events)
                     if e.event_type == "OUT"
                 ),
-                "",
+                None,
             )
-            yield f"{emp_id},{names[emp_id]},{date_str},{first_in},{last_out},{_calc_duration(events)}\n"
+            hours = round(_calc_duration(events), 2)
+            yield f"{emp_id},{names[emp_id]},{date_str},{_fmt_time(first_in_ts)},{_fmt_time(last_out_ts)},{hours}\n"
 
     return StreamingResponse(
         iter_csv(),
@@ -504,24 +516,83 @@ async def absence_report(
             if emp.id not in present_ids:
                 emp_absent_dates[emp.id].append(date_str)
 
-    # Employee absence details (only those with >=1 absence)
+    # Fetch overrides for this month
+    override_result = await db.execute(
+        select(AbsenceOverride)
+        .where(AbsenceOverride.date >= month_start, AbsenceOverride.date <= month_end)
+    )
+    overrides_list = override_result.scalars().all()
+    # Build lookup: {employee_id: {date: status}}
+    override_map: dict[int, dict[str, str]] = defaultdict(dict)
+    for ov in overrides_list:
+        override_map[ov.employee_id][ov.date] = ov.status
+
+    # Statuses that count as "working" — not absent
+    WORKING_OVERRIDES = {"WORK_FROM_HOME", "BUSINESS_TRIP", "SUPPLIER_VISIT"}
+
+    # Fetch settings for concerning thresholds
+    conf_result = await db.execute(select(AttendanceSettings).limit(1))
+    settings_obj = conf_result.scalar_one_or_none()
+    limit_absent = settings_obj.allowed_absent if settings_obj else 5
+    limit_leave = settings_obj.allowed_leave if settings_obj else 10
+    limit_half_day = settings_obj.allowed_half_day if settings_obj else 5
+
+    # Employee absence details — recalculate real absences based on overrides
     employee_details = []
     perfect_attendance = []
     concerning_absences = []
+    adjusted_total_absences = 0
+
     for emp in employees:
         absent_dates = emp_absent_dates.get(emp.id, [])
         if len(absent_dates) == 0:
+            perfect_attendance.append(emp.name)
+            continue
+
+        emp_overrides = {d: override_map[emp.id][d] for d in absent_dates if d in override_map.get(emp.id, {})}
+
+        # Calculate real absence days: skip working overrides, separate leaves and half days
+        real_absent = 0.0
+        real_leave = 0.0
+        real_half_day = 0.0
+        for d in absent_dates:
+            status = emp_overrides.get(d)
+            if status in WORKING_OVERRIDES:
+                continue  # Not absent — working remotely/on trip
+            elif status == "HALF_DAY":
+                real_half_day += 1.0
+            elif status == "LEAVE":
+                real_leave += 1.0
+            else:
+                real_absent += 1.0  # ABSENT or no override
+
+        adjusted_total_absences += real_absent
+
+        if real_absent == 0 and real_half_day == 0 and real_leave == 0:
             perfect_attendance.append(emp.name)
         else:
             detail = AbsenceEmployeeDetail(
                 employee_id=emp.id,
                 name=emp.name,
                 department=emp.department,
-                days_absent=len(absent_dates),
+                days_absent=real_absent,
+                days_leave=real_leave,
+                days_half_day=real_half_day,
                 dates_absent=absent_dates,
+                overrides=emp_overrides,
             )
             employee_details.append(detail)
-            if len(absent_dates) > 5:
+            
+            # Concerning if they meet or exceed (threshold - 1)
+            is_concerning = False
+            if real_absent > 0 and real_absent >= max(1, limit_absent - 1):
+                is_concerning = True
+            elif real_leave > 0 and real_leave >= max(1, limit_leave - 1):
+                is_concerning = True
+            elif real_half_day > 0 and real_half_day >= max(1, limit_half_day - 1):
+                is_concerning = True
+                
+            if is_concerning:
                 concerning_absences.append(detail)
 
     # Sort employee details by most absences first
@@ -529,7 +600,7 @@ async def absence_report(
     concerning_absences.sort(key=lambda x: x.days_absent, reverse=True)
 
     overall_absence_rate = round(
-        (total_absences / (total_employees * total_working_days)) * 100, 1
+        (adjusted_total_absences / (total_employees * total_working_days)) * 100, 1
     ) if (total_employees * total_working_days) > 0 else 0.0
 
     return AbsenceReportResponse(
@@ -538,7 +609,7 @@ async def absence_report(
         month_name=cal_mod.month_name[month],
         total_working_days=total_working_days,
         total_employees=total_employees,
-        total_absences=total_absences,
+        total_absences=adjusted_total_absences,
         absence_rate=overall_absence_rate,
         daily_breakdown=daily_breakdown,
         employee_details=employee_details,
@@ -642,3 +713,250 @@ async def live_stats(
         today_scans=today_scans,
     )
 
+
+# ── Clear Attendance Records (ADMIN-ONLY) ───────────────────────────
+@router.delete("/attendance/clear")
+async def clear_attendance(
+    scope: str = Query(default="all", description="Scope: all, date, range, employee"),
+    date_str: str | None = Query(default=None, description="Date (YYYY-MM-DD) for scope=date"),
+    date_from: str | None = Query(default=None, description="Start date for scope=range"),
+    date_to: str | None = Query(default=None, description="End date for scope=range"),
+    employee_id: int | None = Query(default=None, description="Employee ID for scope=employee"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Admin-only: Delete attendance records by scope.
+
+    Scopes:
+      - all: Delete ALL attendance records
+      - date: Delete records for a specific date  (requires date_str)
+      - range: Delete records in a date range      (requires date_from, date_to)
+      - employee: Delete records for an employee   (requires employee_id)
+    """
+    stmt = sa_delete(Attendance)
+
+    if scope == "date":
+        if not date_str:
+            raise HTTPException(status_code=400, detail="date_str required for scope=date")
+        stmt = stmt.where(Attendance.date == date_str)
+    elif scope == "range":
+        if not date_from or not date_to:
+            raise HTTPException(status_code=400, detail="date_from and date_to required for scope=range")
+        stmt = stmt.where(Attendance.date >= date_from, Attendance.date <= date_to)
+    elif scope == "employee":
+        if not employee_id:
+            raise HTTPException(status_code=400, detail="employee_id required for scope=employee")
+        stmt = stmt.where(Attendance.employee_id == employee_id)
+    elif scope != "all":
+        raise HTTPException(status_code=400, detail=f"Unknown scope: {scope}")
+
+    result = await db.execute(stmt)
+    await db.commit()
+    deleted = result.rowcount
+
+    logger.warning("ADMIN cleared %d attendance records (scope=%s)", deleted, scope)
+
+    return {"success": True, "deleted": deleted, "scope": scope}
+
+
+# ── Absence Override CRUD (ADMIN-ONLY) ──────────────────────────────
+@router.post("/attendance/absence-override")
+async def create_absence_override(
+    body: AbsenceOverrideCreate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Create or update an absence override for a specific employee and date."""
+    if body.status not in VALID_OVERRIDE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(VALID_OVERRIDE_STATUSES)}",
+        )
+
+    # Check if override already exists — upsert
+    existing = await db.execute(
+        select(AbsenceOverride).where(
+            AbsenceOverride.employee_id == body.employee_id,
+            AbsenceOverride.date == body.date,
+        )
+    )
+    override = existing.scalar_one_or_none()
+
+    if override:
+        override.status = body.status
+        override.notes = body.notes
+        override.created_by = admin.id
+    else:
+        override = AbsenceOverride(
+            employee_id=body.employee_id,
+            date=body.date,
+            status=body.status,
+            notes=body.notes,
+            created_by=admin.id,
+        )
+        db.add(override)
+
+    await db.commit()
+    await db.refresh(override)
+
+    return {
+        "id": override.id,
+        "employee_id": override.employee_id,
+        "date": override.date,
+        "status": override.status,
+        "notes": override.notes,
+    }
+
+
+@router.get("/attendance/absence-overrides")
+async def list_absence_overrides(
+    employee_id: int | None = Query(default=None),
+    month: str | None = Query(default=None, description="YYYY-MM"),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """List absence overrides with optional filters."""
+    stmt = (
+        select(AbsenceOverride, Employee.name)
+        .join(Employee, AbsenceOverride.employee_id == Employee.id)
+        .order_by(AbsenceOverride.date.desc())
+    )
+
+    if employee_id:
+        stmt = stmt.where(AbsenceOverride.employee_id == employee_id)
+    if month:
+        stmt = stmt.where(AbsenceOverride.date.startswith(month))
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        AbsenceOverrideRead(
+            id=ov.id,
+            employee_id=ov.employee_id,
+            employee_name=name,
+            date=ov.date,
+            status=ov.status,
+            notes=ov.notes,
+            created_by=ov.created_by,
+            created_at=ov.created_at.isoformat() if ov.created_at else None,
+        )
+        for ov, name in rows
+    ]
+
+
+@router.delete("/attendance/absence-override/{override_id}")
+async def delete_absence_override(
+    override_id: int,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Delete a specific absence override."""
+    result = await db.execute(
+        select(AbsenceOverride).where(AbsenceOverride.id == override_id)
+    )
+    override = result.scalar_one_or_none()
+    if not override:
+        raise HTTPException(status_code=404, detail="Override not found")
+
+    await db.delete(override)
+    await db.commit()
+    return {"success": True, "deleted_id": override_id}
+
+
+# ── Per-Employee Absence Detail ─────────────────────────────────────
+@router.get("/reports/absence/{year}/{month}/employee/{employee_id}",
+            response_model=EmployeeMonthAbsence)
+async def employee_absence_detail(
+    year: int,
+    month: int,
+    employee_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_active_user),
+) -> EmployeeMonthAbsence:
+    """Get absence details for a single employee in a given month."""
+    import calendar as cal_mod
+
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be 1-12")
+
+    # Get employee
+    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
+    emp = emp_result.scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Working days
+    _, days_in_month = cal_mod.monthrange(year, month)
+    working_days = []
+    for day in range(1, days_in_month + 1):
+        d = date(year, month, day)
+        if d.weekday() < 5:
+            working_days.append(d)
+
+    today = date.today()
+    working_days = [d for d in working_days if d <= today]
+    total_working = len(working_days)
+
+    # Attendance for this employee this month
+    month_start = f"{year}-{month:02d}-01"
+    month_end = f"{year}-{month:02d}-{days_in_month:02d}"
+    att_result = await db.execute(
+        select(Attendance)
+        .where(
+            Attendance.employee_id == employee_id,
+            Attendance.date >= month_start,
+            Attendance.date <= month_end,
+            Attendance.event_type == "IN",
+        )
+    )
+    present_dates = {a.date for a in att_result.scalars().all()}
+
+    absent_dates = [d.strftime("%Y-%m-%d") for d in working_days if d.strftime("%Y-%m-%d") not in present_dates]
+
+    # Overrides
+    ov_result = await db.execute(
+        select(AbsenceOverride)
+        .where(
+            AbsenceOverride.employee_id == employee_id,
+            AbsenceOverride.date >= month_start,
+            AbsenceOverride.date <= month_end,
+        )
+    )
+    overrides = {ov.date: ov.status for ov in ov_result.scalars().all()}
+
+    # Calculate real absences considering overrides
+    WORKING_OVERRIDES = {"WORK_FROM_HOME", "BUSINESS_TRIP", "SUPPLIER_VISIT"}
+    real_absent = 0.0
+    real_leave = 0.0
+    real_half_day = 0.0
+    for d in absent_dates:
+        status = overrides.get(d)
+        if status in WORKING_OVERRIDES:
+            continue  # Working day
+        elif status == "HALF_DAY":
+            real_half_day += 1.0
+        elif status == "LEAVE":
+            real_leave += 1.0
+        else:
+            real_absent += 1.0
+
+    days_present = total_working - real_absent - real_leave - real_half_day
+    attendance_rate = round((days_present / total_working) * 100, 1) if total_working > 0 else 0.0
+
+    return EmployeeMonthAbsence(
+        employee_id=emp.id,
+        name=emp.name,
+        department=emp.department,
+        year=year,
+        month=month,
+        month_name=cal_mod.month_name[month],
+        working_days=total_working,
+        days_present=float(days_present),
+        days_absent=float(real_absent),
+        days_leave=float(real_leave),
+        days_half_day=float(real_half_day),
+        dates_absent=absent_dates,
+        overrides=overrides,
+        attendance_rate=attendance_rate,
+    )

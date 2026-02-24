@@ -24,6 +24,7 @@ from app.db.base import Base
 from app.db.session import async_session_factory, engine
 
 # Ensure all models are imported so metadata.create_all can see them
+from app.models.absence_override import AbsenceOverride  # noqa: F401
 from app.models.attendance_settings import AttendanceSettings  # noqa: F401
 from app.models.employee import Attendance, Employee  # noqa: F401
 from app.models.user import User

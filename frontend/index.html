@@ -612,26 +612,19 @@
             <div id="clock" class="clock-display">00:00:00</div>
             <div id="date" class="date-display">...</div>
 
-            <!-- Live Stats Bar -->
-            <div class="live-stats-bar" id="liveStatsBar">
-                <div class="live-stat">
-                    <div class="live-stat-value present" id="statPresent">—</div>
-                    <div class="live-stat-label">Present</div>
-                </div>
-                <div class="live-stat">
-                    <div class="live-stat-value absent" id="statAbsent">—</div>
-                    <div class="live-stat-label">Absent</div>
-                </div>
-                <div class="live-stat">
-                    <div class="live-stat-value late" id="statLate">—</div>
-                    <div class="live-stat-label">Late</div>
-                </div>
-            </div>
+
 
             <div class="visualizer-container" id="visualizer">
                 <div class="scan-ring outer"></div>
                 <div class="scan-ring inner"></div>
-                <div class="scan-icon" id="scanIcon">📡</div>
+                <div class="scan-icon" id="scanIcon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4" />
+                        <path d="M5 12a7 7 0 0 1 7-7c2.8 0 5.2 1.6 6.3 4" />
+                        <path d="M8.5 12a3.5 3.5 0 0 1 3.5-3.5" />
+                        <circle cx="12" cy="12" r="1" />
+                        <path d="M12 13v9" />
+                    </svg></div>
             </div>
 
             <div class="scan-status" id="scanTitle">Ready to Scan</div>
@@ -656,36 +649,7 @@
 
     <input type="text" id="rfidInput" autofocus>
 
-    <!-- Scan Result Overlay -->
-    <div class="scan-result-overlay" id="scanResultOverlay">
-        <div class="scan-result-card">
-            <div class="result-emoji" id="resultEmoji">✅</div>
-            <div class="result-name" id="resultName">—</div>
-            <div class="result-badge badge-in" id="resultBadge">CHECKED IN</div>
-            <div class="result-details">
-                <div class="result-detail-item">
-                    <div class="detail-label">Time</div>
-                    <div class="detail-value" id="resultTime">—</div>
-                </div>
-                <div class="result-detail-item">
-                    <div class="detail-label">Today's Hours</div>
-                    <div class="detail-value" id="resultHours">—</div>
-                </div>
-                <div class="result-detail-item">
-                    <div class="detail-label">Previous Event</div>
-                    <div class="detail-value" id="resultLastEvent">—</div>
-                </div>
-                <div class="result-detail-item">
-                    <div class="detail-label">Previous Time</div>
-                    <div class="detail-value" id="resultLastTime">—</div>
-                </div>
-            </div>
-            <div class="late-warning" id="lateWarning" style="display:none">⚠ YOU ARE LATE</div>
-            <div class="result-progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-        </div>
-    </div>
+
 
     <script src="js/script.js?v=8"></script>
 </body>

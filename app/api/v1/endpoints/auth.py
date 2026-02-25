@@ -7,8 +7,13 @@ from __future__ import annotations
 from fastapi import (APIRouter, Cookie, Depends, HTTPException, Request,
                      Response, status)
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Rate limiter — keyed by client IP
+limiter = Limiter(key_func=get_remote_address)
 
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
 from app.core.config import settings
@@ -24,7 +29,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 async def login_for_access_token(
+    request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
@@ -75,6 +82,7 @@ async def login_for_access_token(
 
 
 @router.post("/refresh", response_model=Token)
+@limiter.limit("10/minute")
 async def refresh_access_token_endpoint(
     response: Response,
     request: Request,

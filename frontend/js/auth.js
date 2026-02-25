@@ -61,7 +61,7 @@ const AUTH = {
         const reset = () => {
             clearTimeout(timer);
             timer = setTimeout(() => {
-                alert('Session expired due to inactivity.');
+                if (typeof showToast === 'function') showToast('Session expired due to inactivity.', 'warning');
                 this.logout();
             }, minutes * 60 * 1000);
         };
@@ -149,7 +149,8 @@ const AUTH = {
             if (user.role) localStorage.setItem(this.USER_ROLE_KEY, user.role);
             if (user.role !== 'admin') {
                 // Authenticated but not admin — send back to kiosk
-                alert('Access Denied: Admin privileges required.');
+                if (typeof showToast === 'function') showToast('Access Denied: Admin privileges required.', 'error');
+                else alert('Access Denied: Admin privileges required.');
                 window.location.href = 'index.html';
                 return null;
             }

@@ -13,6 +13,7 @@ python-jose[cryptography]>=3.3,<4
 passlib[bcrypt]>=1.7,<2
 bcrypt==4.0.1                          # pinned for passlib 1.7.x compat
 python-multipart>=0.0.18          # OAuth2 form parsing
+slowapi>=0.1.9,<1                  # Rate limiting for auth endpoints
 
 # ── Validation & Config ─────────────────────────
 pydantic>=2.0,<3

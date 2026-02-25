@@ -14,6 +14,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 
 from app.api.v1.api import api_router
@@ -91,6 +93,12 @@ def create_app() -> FastAPI:
 
     # Global exception handlers (prevent stack-trace leakage)
     register_exception_handlers(application)
+
+    # Rate-limit exceeded handler (returns 429)
+    from app.api.v1.endpoints.auth import limiter
+
+    application.state.limiter = limiter
+    application.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Mount API v1
     application.include_router(api_router, prefix=settings.API_V1_PREFIX)

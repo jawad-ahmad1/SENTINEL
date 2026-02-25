@@ -8,10 +8,12 @@
   <meta name="description"
     content="Sentinel Enterprise Attendance System — Admin Dashboard for managing employees, attendance, and system health.">
   <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="css/main.css?v=7">
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="css/main.css?v=8">
 </head>
 
 <body>
@@ -171,6 +173,7 @@
   <script src="js/auth.js"></script>
   <!-- 1. Include Layout -->
   <script src="js/layout.js?v=7"></script>
+  <script src="js/toast.js"></script>
 
   <script>
     const API_BASE = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';

@@ -190,8 +190,8 @@ async def scan_card(
                 att_settings.grace_minutes,
                 att_settings.timezone_offset,
             )
-    except Exception:
-        pass  # If settings table doesn't exist yet, don't crash the scan
+    except Exception as e:
+        logger.warning("Could not check late status: %s", e)
 
     return ScanResponse(
         success=True,
@@ -273,7 +273,9 @@ async def list_employees(
         .limit(limit)
     )
     if search:
-        query = query.where(Employee.name.ilike(f"%{search}%"))
+        # Escape SQL LIKE metacharacters to prevent wildcard injection
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        query = query.where(Employee.name.ilike(f"%{safe_search}%", escape="\\"))
     result = await db.execute(query)
     return list(result.scalars().all())
 

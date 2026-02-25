@@ -8,6 +8,7 @@ fetches all events in **one** SQL query and aggregates in Python.
 from __future__ import annotations
 
 import calendar
+import json
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -636,7 +637,21 @@ async def absence_report(
 async def live_stats(
     db: AsyncSession = Depends(get_db),
 ) -> LiveStatsResponse:
-    """Real-time attendance counts for the kiosk idle screen and admin dashboard."""
+    """Real-time attendance counts for the kiosk idle screen and admin dashboard.
+
+    Cached in Redis for 15 seconds to avoid redundant DB hits from kiosk polling.
+    """
+    # ── Try Redis cache first ───────────────────────────────────
+    import redis.asyncio as aioredis
+
+    try:
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        cached = await r.get("sentinel:live_stats")
+        if cached:
+            await r.aclose()
+            return LiveStatsResponse(**json.loads(cached))
+    except Exception:
+        r = None  # Redis unavailable — fall through to DB
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -720,7 +735,7 @@ async def live_stats(
 
     absent = max(0, total_employees - len(employee_events))
 
-    return LiveStatsResponse(
+    result = LiveStatsResponse(
         total_employees=total_employees,
         present=present,
         absent=absent,
@@ -728,6 +743,17 @@ async def live_stats(
         on_time=on_time,
         today_scans=today_scans,
     )
+
+    # ── Cache result in Redis (15s TTL) ─────────────────────────
+    try:
+        if r is None:
+            r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        await r.setex("sentinel:live_stats", 15, result.model_dump_json())
+        await r.aclose()
+    except Exception:
+        pass  # Redis write failure is non-critical
+
+    return result
 
 
 # ── Clear Attendance Records (ADMIN-ONLY) ───────────────────────────

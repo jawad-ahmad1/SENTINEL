@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 _UID_RE = re.compile(r"^[A-Za-z0-9:_-]{2,64}$")
 
@@ -261,7 +261,7 @@ class AbsenceEmployeeDetail(BaseModel):
     days_leave: float
     days_half_day: float
     dates_absent: list[str]
-    overrides: dict[str, str] = {}  # date -> status (LEAVE, WFH, etc.)
+    overrides: dict[str, str] = Field(default_factory=dict)  # date -> status
 
 
 class AbsenceReportResponse(BaseModel):

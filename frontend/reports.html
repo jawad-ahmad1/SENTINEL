@@ -8,10 +8,12 @@
   <meta name="description"
     content="Sentinel Enterprise Attendance System — Attendance reports, absence tracking, daily summaries, and employee analytics.">
   <link rel="icon" type="image/png" href="/img/logo.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="css/main.css?v=7">
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="css/main.css?v=8">
 </head>
 
 <body>
@@ -51,6 +53,7 @@
 
   <script src="js/auth.js"></script>
   <script src="js/layout.js?v=7"></script>
+  <script src="js/toast.js"></script>
   <script>
     // Tab HTML to be injected
     const tabsHTML = `
@@ -225,7 +228,7 @@
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-      } catch (e) { alert('Download failed: ' + e.message); }
+      } catch (e) { showToast('Download failed: ' + e.message, 'error'); }
     }
 
     // Load employees for dropdown
@@ -456,7 +459,7 @@
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          alert(err.detail || 'Failed to set override');
+          showToast(err.detail || 'Failed to set override', 'error');
           return;
         }
         // Stay in current view — reload drill-down if active, else overview
@@ -466,7 +469,7 @@
           loadAbsence(monthInput.value);
         }
       } catch (e) {
-        alert('Network error: ' + e.message);
+        showToast('Network error: ' + e.message, 'error');
       }
     }
 

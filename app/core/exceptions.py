@@ -42,9 +42,7 @@ async def _sqlalchemy_error_handler(
     )
 
 
-async def _generic_exception_handler(
-    _request: Request, exc: Exception
-) -> JSONResponse:
+async def _generic_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled exception: %s", exc)
     return JSONResponse(
         status_code=500,

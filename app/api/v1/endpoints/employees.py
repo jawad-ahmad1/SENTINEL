@@ -16,21 +16,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
+from app.core.config import settings
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
-from app.schemas.attendance import (
-    BreakRequest,
-    BreakResponse,
-    DeleteResponse,
-    EmployeeCreate,
-    EmployeeRead,
-    EmployeeUpdate,
-    ScanRequest,
-    ScanResponse,
-)
+from app.schemas.attendance import (BreakRequest, BreakResponse,
+                                    DeleteResponse, EmployeeCreate,
+                                    EmployeeRead, EmployeeUpdate, ScanRequest,
+                                    ScanResponse)
 
 router = APIRouter(tags=["employees"])
 logger = logging.getLogger(__name__)
@@ -56,7 +50,9 @@ def _compute_today_hours(events: list[Attendance]) -> float:
     return round(total_seconds / 3600, 2)
 
 
-def _check_is_late(events: list[Attendance], work_start: str, grace_minutes: int, tz_offset: str) -> bool:
+def _check_is_late(
+    events: list[Attendance], work_start: str, grace_minutes: int, tz_offset: str
+) -> bool:
     """Check if the employee's first IN today was after work_start + grace."""
     in_events = [e for e in events if e.event_type == "IN"]
     if not in_events:
@@ -67,7 +63,7 @@ def _check_is_late(events: list[Attendance], work_start: str, grace_minutes: int
         ts = ts.replace(tzinfo=timezone.utc)
 
     # Parse timezone offset to convert UTC to local
-    sign = 1 if tz_offset[0] == '+' else -1
+    sign = 1 if tz_offset[0] == "+" else -1
     offset_parts = tz_offset[1:].split(":")
     offset_hours = int(offset_parts[0])
     offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
@@ -78,7 +74,9 @@ def _check_is_late(events: list[Attendance], work_start: str, grace_minutes: int
     # Parse work_start (HH:MM)
     start_parts = work_start.split(":")
     start_hour, start_min = int(start_parts[0]), int(start_parts[1])
-    cutoff = local_time.replace(hour=start_hour, minute=start_min, second=0, microsecond=0) + timedelta(minutes=grace_minutes)
+    cutoff = local_time.replace(
+        hour=start_hour, minute=start_min, second=0, microsecond=0
+    ) + timedelta(minutes=grace_minutes)
 
     return local_time > cutoff
 
@@ -90,16 +88,14 @@ async def scan_card(
     db: AsyncSession = Depends(get_db),
 ) -> ScanResponse:
     """Record an RFID card tap — toggles between IN and OUT.
-    
+
     Uses WRITE LOCKING (with_for_update) to prevent race conditions (double tap).
     Returns enriched response with today's hours, last event, and late status.
     """
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Find or auto-register employee
-    result = await db.execute(
-        select(Employee).where(Employee.rfid_uid == body.uid)
-    )
+    result = await db.execute(select(Employee).where(Employee.rfid_uid == body.uid))
     employee = result.scalar_one_or_none()
 
     if employee is None:
@@ -140,8 +136,10 @@ async def scan_card(
         last_ts = last_event.timestamp
         if last_ts.tzinfo is None:
             last_ts = last_ts.replace(tzinfo=timezone.utc)
-        
-        if (datetime.now(timezone.utc) - last_ts).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
+
+        if (
+            datetime.now(timezone.utc) - last_ts
+        ).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
             return ScanResponse(
                 success=True,
                 event=last_event.event_type,
@@ -186,7 +184,12 @@ async def scan_card(
         settings_result = await db.execute(select(AttendanceSettings).limit(1))
         att_settings = settings_result.scalar_one_or_none()
         if att_settings:
-            is_late = _check_is_late(all_today, att_settings.work_start, att_settings.grace_minutes, att_settings.timezone_offset)
+            is_late = _check_is_late(
+                all_today,
+                att_settings.work_start,
+                att_settings.grace_minutes,
+                att_settings.timezone_offset,
+            )
     except Exception:
         pass  # If settings table doesn't exist yet, don't crash the scan
 
@@ -209,9 +212,7 @@ async def _record_break_event(
     uid: str, event_type: str, db: AsyncSession
 ) -> BreakResponse:
     """Internal helper to record BREAK_START or BREAK_END events."""
-    result = await db.execute(
-        select(Employee).where(Employee.rfid_uid == uid)
-    )
+    result = await db.execute(select(Employee).where(Employee.rfid_uid == uid))
     employee = result.scalar_one_or_none()
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -307,9 +308,7 @@ async def get_employee(
     _user: User = Depends(get_current_active_user),
 ) -> Employee:
     result = await db.execute(
-        select(Employee).where(
-            Employee.id == employee_id, Employee.is_active.is_(True)
-        )
+        select(Employee).where(Employee.id == employee_id, Employee.is_active.is_(True))
     )
     emp = result.scalar_one_or_none()
     if emp is None:
@@ -324,9 +323,7 @@ async def update_employee(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> Employee:
-    result = await db.execute(
-        select(Employee).where(Employee.id == employee_id)
-    )
+    result = await db.execute(select(Employee).where(Employee.id == employee_id))
     emp = result.scalar_one_or_none()
     if emp is None:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -347,9 +344,7 @@ async def delete_employee(
     _admin: User = Depends(require_admin),
 ) -> DeleteResponse:
     """Soft-delete (deactivate) an employee. Attendance history is preserved."""
-    result = await db.execute(
-        select(Employee).where(Employee.id == employee_id)
-    )
+    result = await db.execute(select(Employee).where(Employee.id == employee_id))
     emp = result.scalar_one_or_none()
     if emp is None:
         raise HTTPException(status_code=404, detail="Employee not found")

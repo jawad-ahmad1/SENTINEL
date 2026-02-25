@@ -13,34 +13,26 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy import delete as sa_delete, func, select
+from fastapi.responses import StreamingResponse
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
+from app.core.config import settings
 from app.models.absence_override import AbsenceOverride
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
-from app.schemas.attendance import (
-    AbsenceDayDetail,
-    AbsenceEmployeeDetail,
-    AbsenceOverrideCreate,
-    AbsenceOverrideRead,
-    AbsenceReportResponse,
-    AttendanceFeedItem,
-    DailySummaryResponse,
-    EmployeeAnalyticsResponse,
-    EmployeeMonthAbsence,
-    HealthResponse,
-    LiveStatsResponse,
-    MonthlyReportResponse,
-    StatusResponse,
-    TrendsResponse,
-    VALID_OVERRIDE_STATUSES,
-)
+from app.schemas.attendance import (VALID_OVERRIDE_STATUSES, AbsenceDayDetail,
+                                    AbsenceEmployeeDetail,
+                                    AbsenceOverrideCreate, AbsenceOverrideRead,
+                                    AbsenceReportResponse, AttendanceFeedItem,
+                                    DailySummaryResponse,
+                                    EmployeeAnalyticsResponse,
+                                    EmployeeMonthAbsence, HealthResponse,
+                                    LiveStatsResponse, MonthlyReportResponse,
+                                    StatusResponse, TrendsResponse)
 
 router = APIRouter(tags=["reports"])
 logger = logging.getLogger(__name__)
@@ -61,7 +53,7 @@ def _calc_duration(events: list[Attendance]) -> float:
 
     Addresses the 'Overnight Shift' bug by NOT assuming an open session
     ends 'now' if it's in the past. It only counts closed sessions.
-    
+
     If a session is 'IN' but no 'OUT', it is considered 0 hours for that segment
     to avoid 'Infinite Hours' bug. The OUT will be captured on the next day's logic
     if we implement shift linking, but for simple 'Daily' reports, we must be conservative.
@@ -204,11 +196,7 @@ async def daily_csv(
                 (e.timestamp for e in events if e.event_type == "IN"), None
             )
             last_out_ts = next(
-                (
-                    e.timestamp
-                    for e in reversed(events)
-                    if e.event_type == "OUT"
-                ),
+                (e.timestamp for e in reversed(events) if e.event_type == "OUT"),
                 None,
             )
             hours = round(_calc_duration(events), 2)
@@ -296,9 +284,7 @@ async def analytics_trends(
     result = await db.execute(
         select(
             Attendance.date,
-            func.count(func.distinct(Attendance.employee_id)).label(
-                "unique_employees"
-            ),
+            func.count(func.distinct(Attendance.employee_id)).label("unique_employees"),
             func.count(Attendance.id).label("total_events"),
         )
         .where(Attendance.date >= start)
@@ -320,16 +306,16 @@ async def analytics_trends(
 
 
 # ── Employee Analytics (N+1 FIXED — single query for 30 days) ──────
-@router.get("/analytics/employee/{employee_id}", response_model=EmployeeAnalyticsResponse)
+@router.get(
+    "/analytics/employee/{employee_id}", response_model=EmployeeAnalyticsResponse
+)
 async def employee_analytics(
     employee_id: int,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_active_user),
 ) -> EmployeeAnalyticsResponse:
     """Return 30-day attendance analytics for a specific employee."""
-    emp_result = await db.execute(
-        select(Employee).where(Employee.id == employee_id)
-    )
+    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
     employee = emp_result.scalar_one_or_none()
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -390,6 +376,7 @@ async def health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
 
     try:
         import redis.asyncio as aioredis
+
         r = aioredis.from_url(settings.REDIS_URL)
         await r.ping()
         await r.close()
@@ -432,7 +419,6 @@ async def absence_report(
 ) -> AbsenceReportResponse:
     """Generate a monthly absence report with daily breakdown and employee details."""
     import calendar as cal_mod
-    from datetime import timedelta
 
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be 1-12")
@@ -446,10 +432,17 @@ async def absence_report(
 
     if total_employees == 0:
         return AbsenceReportResponse(
-            year=year, month=month, month_name=cal_mod.month_name[month],
-            total_working_days=0, total_employees=0, total_absences=0,
-            absence_rate=0.0, daily_breakdown=[], employee_details=[],
-            perfect_attendance=[], concerning_absences=[],
+            year=year,
+            month=month,
+            month_name=cal_mod.month_name[month],
+            total_working_days=0,
+            total_employees=0,
+            total_absences=0,
+            absence_rate=0.0,
+            daily_breakdown=[],
+            employee_details=[],
+            perfect_attendance=[],
+            concerning_absences=[],
         )
 
     # Determine working days (Mon-Fri) in the month
@@ -467,10 +460,17 @@ async def absence_report(
 
     if total_working_days == 0:
         return AbsenceReportResponse(
-            year=year, month=month, month_name=cal_mod.month_name[month],
-            total_working_days=0, total_employees=total_employees, total_absences=0,
-            absence_rate=0.0, daily_breakdown=[], employee_details=[],
-            perfect_attendance=[e.name for e in employees], concerning_absences=[],
+            year=year,
+            month=month,
+            month_name=cal_mod.month_name[month],
+            total_working_days=0,
+            total_employees=total_employees,
+            total_absences=0,
+            absence_rate=0.0,
+            daily_breakdown=[],
+            employee_details=[],
+            perfect_attendance=[e.name for e in employees],
+            concerning_absences=[],
         )
 
     # Fetch ALL attendance for this month in ONE query
@@ -500,16 +500,20 @@ async def absence_report(
         present = len(present_ids)
         absent = total_employees - present
         total_absences += absent
-        absence_rate = round((absent / total_employees) * 100, 1) if total_employees > 0 else 0.0
+        absence_rate = (
+            round((absent / total_employees) * 100, 1) if total_employees > 0 else 0.0
+        )
 
-        daily_breakdown.append(AbsenceDayDetail(
-            date=date_str,
-            day_name=wd.strftime("%A"),
-            expected=total_employees,
-            present=present,
-            absent=absent,
-            absence_rate=absence_rate,
-        ))
+        daily_breakdown.append(
+            AbsenceDayDetail(
+                date=date_str,
+                day_name=wd.strftime("%A"),
+                expected=total_employees,
+                present=present,
+                absent=absent,
+                absence_rate=absence_rate,
+            )
+        )
 
         # Track which employees were absent each day
         for emp in employees:
@@ -518,8 +522,9 @@ async def absence_report(
 
     # Fetch overrides for this month
     override_result = await db.execute(
-        select(AbsenceOverride)
-        .where(AbsenceOverride.date >= month_start, AbsenceOverride.date <= month_end)
+        select(AbsenceOverride).where(
+            AbsenceOverride.date >= month_start, AbsenceOverride.date <= month_end
+        )
     )
     overrides_list = override_result.scalars().all()
     # Build lookup: {employee_id: {date: status}}
@@ -549,7 +554,11 @@ async def absence_report(
             perfect_attendance.append(emp.name)
             continue
 
-        emp_overrides = {d: override_map[emp.id][d] for d in absent_dates if d in override_map.get(emp.id, {})}
+        emp_overrides = {
+            d: override_map[emp.id][d]
+            for d in absent_dates
+            if d in override_map.get(emp.id, {})
+        }
 
         # Calculate real absence days: skip working overrides, separate leaves and half days
         real_absent = 0.0
@@ -582,7 +591,7 @@ async def absence_report(
                 overrides=emp_overrides,
             )
             employee_details.append(detail)
-            
+
             # Concerning if they meet or exceed (threshold - 1)
             is_concerning = False
             if real_absent > 0 and real_absent >= max(1, limit_absent - 1):
@@ -591,7 +600,7 @@ async def absence_report(
                 is_concerning = True
             elif real_half_day > 0 and real_half_day >= max(1, limit_half_day - 1):
                 is_concerning = True
-                
+
             if is_concerning:
                 concerning_absences.append(detail)
 
@@ -599,9 +608,13 @@ async def absence_report(
     employee_details.sort(key=lambda x: x.days_absent, reverse=True)
     concerning_absences.sort(key=lambda x: x.days_absent, reverse=True)
 
-    overall_absence_rate = round(
-        (adjusted_total_absences / (total_employees * total_working_days)) * 100, 1
-    ) if (total_employees * total_working_days) > 0 else 0.0
+    overall_absence_rate = (
+        round(
+            (adjusted_total_absences / (total_employees * total_working_days)) * 100, 1
+        )
+        if (total_employees * total_working_days) > 0
+        else 0.0
+    )
 
     return AbsenceReportResponse(
         year=year,
@@ -624,7 +637,6 @@ async def live_stats(
     db: AsyncSession = Depends(get_db),
 ) -> LiveStatsResponse:
     """Real-time attendance counts for the kiosk idle screen and admin dashboard."""
-    from datetime import timedelta
 
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -649,7 +661,7 @@ async def live_stats(
     all_today = list(att_result.scalars().all())
 
     # Group by employee — determine who is currently IN (last event = IN)
-    from itertools import groupby
+
     employee_events: dict[int, list[Attendance]] = defaultdict(list)
     for att in all_today:
         employee_events[att.employee_id].append(att)
@@ -685,17 +697,21 @@ async def live_stats(
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
 
-            sign = 1 if tz_offset[0] == '+' else -1
+            sign = 1 if tz_offset[0] == "+" else -1
             offset_parts = tz_offset[1:].split(":")
             offset_hours = int(offset_parts[0])
             offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
-            local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
+            local_offset = timedelta(
+                hours=sign * offset_hours, minutes=sign * offset_mins
+            )
             local_tz = timezone(local_offset)
             local_time = ts.astimezone(local_tz)
 
             start_parts = work_start.split(":")
             start_hour, start_min = int(start_parts[0]), int(start_parts[1])
-            cutoff = local_time.replace(hour=start_hour, minute=start_min, second=0, microsecond=0) + timedelta(minutes=grace_minutes)
+            cutoff = local_time.replace(
+                hour=start_hour, minute=start_min, second=0, microsecond=0
+            ) + timedelta(minutes=grace_minutes)
 
             if local_time > cutoff:
                 late += 1
@@ -718,10 +734,16 @@ async def live_stats(
 @router.delete("/attendance/clear")
 async def clear_attendance(
     scope: str = Query(default="all", description="Scope: all, date, range, employee"),
-    date_str: str | None = Query(default=None, description="Date (YYYY-MM-DD) for scope=date"),
-    date_from: str | None = Query(default=None, description="Start date for scope=range"),
+    date_str: str | None = Query(
+        default=None, description="Date (YYYY-MM-DD) for scope=date"
+    ),
+    date_from: str | None = Query(
+        default=None, description="Start date for scope=range"
+    ),
     date_to: str | None = Query(default=None, description="End date for scope=range"),
-    employee_id: int | None = Query(default=None, description="Employee ID for scope=employee"),
+    employee_id: int | None = Query(
+        default=None, description="Employee ID for scope=employee"
+    ),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -737,15 +759,21 @@ async def clear_attendance(
 
     if scope == "date":
         if not date_str:
-            raise HTTPException(status_code=400, detail="date_str required for scope=date")
+            raise HTTPException(
+                status_code=400, detail="date_str required for scope=date"
+            )
         stmt = stmt.where(Attendance.date == date_str)
     elif scope == "range":
         if not date_from or not date_to:
-            raise HTTPException(status_code=400, detail="date_from and date_to required for scope=range")
+            raise HTTPException(
+                status_code=400, detail="date_from and date_to required for scope=range"
+            )
         stmt = stmt.where(Attendance.date >= date_from, Attendance.date <= date_to)
     elif scope == "employee":
         if not employee_id:
-            raise HTTPException(status_code=400, detail="employee_id required for scope=employee")
+            raise HTTPException(
+                status_code=400, detail="employee_id required for scope=employee"
+            )
         stmt = stmt.where(Attendance.employee_id == employee_id)
     elif scope != "all":
         raise HTTPException(status_code=400, detail=f"Unknown scope: {scope}")
@@ -865,8 +893,10 @@ async def delete_absence_override(
 
 
 # ── Per-Employee Absence Detail ─────────────────────────────────────
-@router.get("/reports/absence/{year}/{month}/employee/{employee_id}",
-            response_model=EmployeeMonthAbsence)
+@router.get(
+    "/reports/absence/{year}/{month}/employee/{employee_id}",
+    response_model=EmployeeMonthAbsence,
+)
 async def employee_absence_detail(
     year: int,
     month: int,
@@ -902,8 +932,7 @@ async def employee_absence_detail(
     month_start = f"{year}-{month:02d}-01"
     month_end = f"{year}-{month:02d}-{days_in_month:02d}"
     att_result = await db.execute(
-        select(Attendance)
-        .where(
+        select(Attendance).where(
             Attendance.employee_id == employee_id,
             Attendance.date >= month_start,
             Attendance.date <= month_end,
@@ -912,12 +941,15 @@ async def employee_absence_detail(
     )
     present_dates = {a.date for a in att_result.scalars().all()}
 
-    absent_dates = [d.strftime("%Y-%m-%d") for d in working_days if d.strftime("%Y-%m-%d") not in present_dates]
+    absent_dates = [
+        d.strftime("%Y-%m-%d")
+        for d in working_days
+        if d.strftime("%Y-%m-%d") not in present_dates
+    ]
 
     # Overrides
     ov_result = await db.execute(
-        select(AbsenceOverride)
-        .where(
+        select(AbsenceOverride).where(
             AbsenceOverride.employee_id == employee_id,
             AbsenceOverride.date >= month_start,
             AbsenceOverride.date <= month_end,
@@ -942,7 +974,9 @@ async def employee_absence_detail(
             real_absent += 1.0
 
     days_present = total_working - real_absent - real_leave - real_half_day
-    attendance_rate = round((days_present / total_working) * 100, 1) if total_working > 0 else 0.0
+    attendance_rate = (
+        round((days_present / total_working) * 100, 1) if total_working > 0 else 0.0
+    )
 
     return EmployeeMonthAbsence(
         employee_id=emp.id,

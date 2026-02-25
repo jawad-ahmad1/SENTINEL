@@ -33,22 +33,22 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
-    access_token: Optional[str] = Cookie(default=None), # Read from HttpOnly Cookie
+    access_token: Optional[str] = Cookie(default=None),  # Read from HttpOnly Cookie
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Decode JWT from Header OR Cookie, look up user."""
-    
+
     # Priority: Header > Cookie
     final_token = token
     if not final_token:
         # Try cookie (formatted as "Bearer <token>" or just "<token>")
         if access_token:
-             # Our auth.py sets values as "Bearer <token>"
-             if access_token.startswith("Bearer "):
-                 final_token = access_token.split(" ")[1]
-             else:
-                 final_token = access_token
-    
+            # Our auth.py sets values as "Bearer <token>"
+            if access_token.startswith("Bearer "):
+                final_token = access_token.split(" ")[1]
+            else:
+                final_token = access_token
+
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

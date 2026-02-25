@@ -6,11 +6,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
+                                    create_async_engine)
 
 from app.core.config import settings
 
@@ -20,11 +17,13 @@ engine_args = {
 }
 
 if "postgresql" in settings.DATABASE_URL:
-    engine_args.update({
-        "pool_size": 20,
-        "max_overflow": 10,
-        "pool_recycle": 300,
-    })
+    engine_args.update(
+        {
+            "pool_size": 20,
+            "max_overflow": 10,
+            "pool_recycle": 300,
+        }
+    )
 
 engine = create_async_engine(
     settings.DATABASE_URL,

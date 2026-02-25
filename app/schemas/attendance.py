@@ -280,7 +280,11 @@ class AbsenceReportResponse(BaseModel):
 
 # ── Absence Overrides ──────────────────────────────────────────────
 VALID_OVERRIDE_STATUSES = [
-    "LEAVE", "BUSINESS_TRIP", "WORK_FROM_HOME", "HALF_DAY", "SUPPLIER_VISIT",
+    "LEAVE",
+    "BUSINESS_TRIP",
+    "WORK_FROM_HOME",
+    "HALF_DAY",
+    "SUPPLIER_VISIT",
 ]
 
 

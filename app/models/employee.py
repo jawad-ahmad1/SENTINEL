@@ -6,15 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-)
+from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, Index, Integer,
+                        String)
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -45,9 +38,7 @@ class Employee(Base):
 
 class Attendance(Base):
     __tablename__ = "attendance"
-    __table_args__ = (
-        Index("ix_attendance_employee_date", "employee_id", "date"),
-    )
+    __table_args__ = (Index("ix_attendance_employee_date", "employee_id", "date"),)
 
     id: int = Column(Integer, primary_key=True, index=True)  # type: ignore[assignment]
     employee_id: int = Column(Integer, ForeignKey("employees.id"), nullable=False)  # type: ignore[assignment]

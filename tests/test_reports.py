@@ -1,6 +1,7 @@
 """Tests for reporting and analytics endpoints."""
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+
 import pytest
 from httpx import AsyncClient
 
@@ -10,11 +11,13 @@ def _utc_today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-async def _seed_employee_with_scans(async_client: AsyncClient, uid="RPT-001", name="Reporter"):
+async def _seed_employee_with_scans(
+    async_client: AsyncClient, uid="RPT-001", name="Reporter"
+):
     """Helper: register an employee and create IN/OUT scan pair for today."""
     await async_client.post("/api/v1/employees", json={"name": name, "rfid_uid": uid})
-    import asyncio
     from unittest.mock import patch
+
     from app.core.config import settings
 
     # Bypass bounce protection
@@ -73,7 +76,9 @@ async def test_monthly_report(async_client: AsyncClient):
     """GET /reports/monthly/{year}/{month} should return monthly data."""
     await _seed_employee_with_scans(async_client)
     today_dt = datetime.now(timezone.utc)
-    resp = await async_client.get(f"/api/v1/reports/monthly/{today_dt.year}/{today_dt.month}")
+    resp = await async_client.get(
+        f"/api/v1/reports/monthly/{today_dt.year}/{today_dt.month}"
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert "employees" in data
@@ -95,7 +100,9 @@ async def test_analytics_trends(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_employee_analytics(async_client: AsyncClient):
     """GET /analytics/employee/{id} should return 30-day analytics."""
-    await async_client.post("/api/v1/employees", json={"name": "Analyst", "rfid_uid": "ANA-001"})
+    await async_client.post(
+        "/api/v1/employees", json={"name": "Analyst", "rfid_uid": "ANA-001"}
+    )
     await async_client.post("/api/v1/scan", json={"uid": "ANA-001"})  # IN
     # Get employee ID
     emps = (await async_client.get("/api/v1/employees")).json()

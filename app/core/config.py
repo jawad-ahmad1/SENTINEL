@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # ── Database (async PostgreSQL via asyncpg) ─────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://attendance:attendance@localhost:5432/attendance_db"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://attendance:attendance@localhost:5432/attendance_db"
+    )
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # ── JWT ──────────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ settings = Settings()
 
 if settings.SECRET_KEY == "CHANGE-ME-TO-A-RANDOM-64-CHAR-HEX-STRING-IN-PRODUCTION":
     import logging
+
     logging.getLogger("app.core.config").warning(
         "⚠️  WARNING: You are running with the default INSECURE Secret Key! "
         "Update the SECRET_KEY in your .env file immediately."

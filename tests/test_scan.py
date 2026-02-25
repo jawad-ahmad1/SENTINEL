@@ -3,6 +3,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.asyncio
 async def test_scan_auto_registers_unknown_uid(async_client: AsyncClient):
     """Scanning an unknown UID should auto-register and clock IN."""
@@ -21,6 +22,7 @@ async def test_scan_auto_registers_unknown_uid(async_client: AsyncClient):
 async def test_scan_toggles_in_out(async_client: AsyncClient):
     """Consecutive scans should alternate between IN and OUT."""
     from unittest.mock import patch
+
     from app.core.config import settings
 
     with patch.object(settings, "BOUNCE_WINDOW_SECONDS", 0.0):
@@ -41,7 +43,9 @@ async def test_scan_toggles_in_out(async_client: AsyncClient):
 async def test_scan_returns_employee_name(async_client: AsyncClient):
     """After registering an employee, scan should return their name."""
     # Register named employee first
-    await async_client.post("/api/v1/employees", json={"name": "Alice Smith", "rfid_uid": "ALICE-01"})
+    await async_client.post(
+        "/api/v1/employees", json={"name": "Alice Smith", "rfid_uid": "ALICE-01"}
+    )
     resp = await async_client.post("/api/v1/scan", json={"uid": "ALICE-01"})
     data = resp.json()
     assert data["name"] == "Alice Smith"
@@ -57,7 +61,9 @@ async def test_scan_rejects_empty_uid(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_scan_rejects_invalid_uid(async_client: AsyncClient):
     """UID with special characters should be rejected."""
-    resp = await async_client.post("/api/v1/scan", json={"uid": "<script>alert(1)</script>"})
+    resp = await async_client.post(
+        "/api/v1/scan", json={"uid": "<script>alert(1)</script>"}
+    )
     assert resp.status_code == 422
 
 

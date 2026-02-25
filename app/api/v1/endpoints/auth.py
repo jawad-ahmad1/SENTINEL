@@ -4,20 +4,17 @@ Auth endpoints — login (OAuth2 password flow) & token refresh.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import (APIRouter, Cookie, Depends, HTTPException, Request,
+                     Response, status)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_db, get_current_active_user, require_admin
+from app.api.v1.deps import get_current_active_user, get_db, require_admin
 from app.core.config import settings
-from app.core.security import (
-    create_access_token,
-    create_refresh_token,
-    decode_refresh_token,
-    get_password_hash,
-    verify_password,
-)
+from app.core.security import (create_access_token, create_refresh_token,
+                               decode_refresh_token, get_password_hash,
+                               verify_password)
 from app.models.user import User
 from app.schemas.attendance import LogoutResponse
 from app.schemas.token import RefreshRequest, Token
@@ -91,7 +88,7 @@ async def refresh_access_token_endpoint(
         token_str = body.refresh_token
     elif refresh_token_cookie:
         token_str = refresh_token_cookie
-    
+
     if not token_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -138,6 +135,7 @@ async def refresh_access_token_endpoint(
         access_token=new_access,
         refresh_token=new_refresh,
     )
+
 
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(response: Response) -> LogoutResponse:

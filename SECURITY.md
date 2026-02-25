@@ -14,7 +14,7 @@
 
 If you discover a security vulnerability, please report it responsibly:
 
-1. **Email:** Send details to **security@company.com**
+1. **Email:** Send details to **seejawad556@gmail.com**
 2. **Subject:** `[SECURITY] Sentinel — <brief description>`
 3. **Include:**
    - Description of the vulnerability

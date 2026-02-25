@@ -212,8 +212,53 @@ sentinel-attendance/
 ├── DEPLOYMENT_GUIDE.md           # Production deployment (5-day plan)
 ├── HARDWARE_SETUP_GUIDE.md       # RFID readers, kiosks, setup
 ├── USER_GUIDE.md                 # Complete user & admin manual
-└── LICENSE                       # MIT License
+├── INSTALLATION.md               # Setup instructions (Docker/manual/Windows)
+├── CONFIGURATION.md              # Environment variables & settings
+├── API_DOCUMENTATION.md          # Full API endpoint reference
+├── ARCHITECTURE.md               # System design & Mermaid diagrams
+├── TESTING.md                    # Test suite & CI guide
+├── CONTRIBUTING.md               # Contribution guidelines
+├── CODE_OF_CONDUCT.md            # Contributor Covenant v2.1
+├── SECURITY.md                   # Security policy & architecture
+├── CHANGELOG.md                  # Version history (Keep a Changelog)
+├── TROUBLESHOOTING.md            # Common issues & solutions
+├── FAQ.md                        # Frequently asked questions
+├── ROADMAP.md                    # Future development plans
+├── SUPPORT.md                    # How to get help
+├── LICENSE                       # MIT License
+│
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md         # Bug report template
+│   │   └── feature_request.md    # Feature request template
+│   └── PULL_REQUEST_TEMPLATE.md  # PR checklist template
+│
+└── docs/
+    ├── screenshots/              # App screenshots (see README inside)
+    └── diagrams/                 # Architecture diagrams
 ```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Installation](INSTALLATION.md)** | Docker, manual, and Windows setup guides |
+| **[Configuration](CONFIGURATION.md)** | Environment variables and settings reference |
+| **[API Reference](API_DOCUMENTATION.md)** | All endpoints with curl examples |
+| **[Architecture](ARCHITECTURE.md)** | System design, data flow, Mermaid diagrams |
+| **[Hardware Setup](HARDWARE_SETUP_GUIDE.md)** | RFID reader purchasing, wiring, testing |
+| **[User Guide](USER_GUIDE.md)** | Complete admin and employee manual |
+| **[Deployment](DEPLOYMENT_GUIDE.md)** | Production deployment (TLS, backups, monitoring) |
+| **[Testing](TESTING.md)** | Test suite, CI, and quality gates |
+| **[Troubleshooting](TROUBLESHOOTING.md)** | Common issues and fixes |
+| **[FAQ](FAQ.md)** | Frequently asked questions |
+| **[Security](SECURITY.md)** | Vulnerability reporting and security architecture |
+| **[Changelog](CHANGELOG.md)** | Version history |
+| **[Roadmap](ROADMAP.md)** | Planned features |
+| **[Contributing](CONTRIBUTING.md)** | How to contribute |
+| **[Support](SUPPORT.md)** | How to get help |
 
 ---
 
@@ -305,9 +350,11 @@ Complete documentation covering admin workflows, employee management, reporting,
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+→ **Full guide:** [CONTRIBUTING.md](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ---
 

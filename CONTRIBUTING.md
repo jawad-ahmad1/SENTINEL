@@ -16,7 +16,7 @@ First off, thank you for considering contributing to Sentinel! 🎉 Every contri
 
 ## Code of Conduct
 
-This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [admin@company.com](mailto:admin@company.com).
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [seejawad556@gmail.com](mailto:seejawad556@gmail.com).
 
 ---
 

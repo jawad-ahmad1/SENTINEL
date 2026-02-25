@@ -324,7 +324,14 @@
                     body: formData
                 });
 
-                const data = await res.json();
+                let data = {};
+                const contentType = res.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await res.json();
+                } else {
+                    data.detail = `Server error (${res.status}). Ensure the backend is running.`;
+                }
+
                 if (!res.ok) throw new Error(data.detail || 'Login failed');
 
                 // Get Role (must include credentials to send the session cookie)

@@ -4,8 +4,7 @@ Auth endpoints — login (OAuth2 password flow) & token refresh.
 
 from __future__ import annotations
 
-from fastapi import (APIRouter, Cookie, Depends, HTTPException, Request,
-                     Response, status)
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -17,9 +16,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
 from app.core.config import settings
-from app.core.security import (create_access_token, create_refresh_token,
-                               decode_refresh_token, get_password_hash,
-                               verify_password)
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    get_password_hash,
+    verify_password,
+)
 from app.models.user import User
 from app.schemas.attendance import LogoutResponse
 from app.schemas.token import RefreshRequest, Token
@@ -37,9 +40,7 @@ async def login_for_access_token(
     db: AsyncSession = Depends(get_db),
 ) -> Token:
     """Authenticate with user/pass. Returns 200 OK with HttpOnly Cookies."""
-    result = await db.execute(
-        select(User).where(User.email == form_data.username.lower().strip())
-    )
+    result = await db.execute(select(User).where(User.email == form_data.username.lower().strip()))
     user = result.scalar_one_or_none()
 
     if user is None or not verify_password(form_data.password, user.hashed_password):
@@ -111,6 +112,11 @@ async def refresh_access_token_endpoint(
         )
 
     user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token payload",
+        )
     result = await db.execute(select(User).where(User.id == int(user_id)))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:

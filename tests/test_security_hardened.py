@@ -27,9 +27,7 @@ def event_loop():
 
 
 @pytest.mark.asyncio
-async def test_concurrency_double_tap(
-    async_client: AsyncClient, db_session: AsyncSession
-):
+async def test_concurrency_double_tap(async_client: AsyncClient, db_session: AsyncSession):
     """
     Test that two simultaneous scan requests for the same UID result in:
     1. One successful scan (IN)
@@ -46,9 +44,7 @@ async def test_concurrency_double_tap(
     await db_session.commit()
 
     # 2. Get Token
-    user = User(
-        email="kiosk@test.com", hashed_password="pw", is_active=True, role="kiosk"
-    )
+    user = User(email="kiosk@test.com", hashed_password="pw", is_active=True, role="kiosk")
     db_session.add(user)
     await db_session.commit()
     token = create_access_token(user.id)
@@ -56,9 +52,7 @@ async def test_concurrency_double_tap(
 
     # 3. Launch 2 simultaneous requests
     async def make_scan():
-        return await async_client.post(
-            "/api/v1/scan", json={"uid": uid}, headers=headers
-        )
+        return await async_client.post("/api/v1/scan", json={"uid": uid}, headers=headers)
 
     # We use gather to run them as close to parallel as possible
     # Note: SQLite in tests might lock differently than Postgres, but logic holds.
@@ -94,9 +88,7 @@ async def test_concurrency_double_tap(
 
 
 @pytest.mark.asyncio
-async def test_auth_cookies_httponly(
-    async_client: AsyncClient, db_session: AsyncSession
-):
+async def test_auth_cookies_httponly(async_client: AsyncClient, db_session: AsyncSession):
     """
     Test that login endpoint sets HttpOnly cookies.
     """
@@ -105,9 +97,7 @@ async def test_auth_cookies_httponly(
     password = "password123"
     from app.core.security import get_password_hash
 
-    user = User(
-        email=email, hashed_password=get_password_hash(password), is_active=True
-    )
+    user = User(email=email, hashed_password=get_password_hash(password), is_active=True)
     db_session.add(user)
     await db_session.commit()
 

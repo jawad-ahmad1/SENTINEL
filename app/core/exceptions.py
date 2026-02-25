@@ -13,18 +13,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 logger = logging.getLogger(__name__)
 
 
-async def _http_exception_handler(
-    _request: Request, exc: HTTPException
-) -> JSONResponse:
+async def _http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "success": False},
     )
 
 
-async def _integrity_error_handler(
-    _request: Request, exc: IntegrityError
-) -> JSONResponse:
+async def _integrity_error_handler(_request: Request, exc: IntegrityError) -> JSONResponse:
     logger.error("Database integrity error: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=409,
@@ -32,9 +28,7 @@ async def _integrity_error_handler(
     )
 
 
-async def _sqlalchemy_error_handler(
-    _request: Request, exc: SQLAlchemyError
-) -> JSONResponse:
+async def _sqlalchemy_error_handler(_request: Request, exc: SQLAlchemyError) -> JSONResponse:
     logger.error("Database error: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,

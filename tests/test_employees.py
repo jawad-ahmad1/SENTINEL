@@ -28,9 +28,7 @@ async def test_create_employee(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_create_duplicate_rfid_rejected(async_client: AsyncClient):
     """Creating two employees with the same RFID should fail."""
-    await async_client.post(
-        "/api/v1/employees", json={"name": "Emp1", "rfid_uid": "DUP-001"}
-    )
+    await async_client.post("/api/v1/employees", json={"name": "Emp1", "rfid_uid": "DUP-001"})
     resp = await async_client.post(
         "/api/v1/employees", json={"name": "Emp2", "rfid_uid": "DUP-001"}
     )
@@ -41,12 +39,8 @@ async def test_create_duplicate_rfid_rejected(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_list_employees(async_client: AsyncClient):
     """GET /employees should return all active employees."""
-    await async_client.post(
-        "/api/v1/employees", json={"name": "E1", "rfid_uid": "LIST-001"}
-    )
-    await async_client.post(
-        "/api/v1/employees", json={"name": "E2", "rfid_uid": "LIST-002"}
-    )
+    await async_client.post("/api/v1/employees", json={"name": "E1", "rfid_uid": "LIST-001"})
+    await async_client.post("/api/v1/employees", json={"name": "E2", "rfid_uid": "LIST-002"})
     resp = await async_client.get("/api/v1/employees")
     assert resp.status_code == 200
     data = resp.json()

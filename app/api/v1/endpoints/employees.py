@@ -21,10 +21,16 @@ from app.core.config import settings
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
-from app.schemas.attendance import (BreakRequest, BreakResponse,
-                                    DeleteResponse, EmployeeCreate,
-                                    EmployeeRead, EmployeeUpdate, ScanRequest,
-                                    ScanResponse)
+from app.schemas.attendance import (
+    BreakRequest,
+    BreakResponse,
+    DeleteResponse,
+    EmployeeCreate,
+    EmployeeRead,
+    EmployeeUpdate,
+    ScanRequest,
+    ScanResponse,
+)
 
 router = APIRouter(tags=["employees"])
 logger = logging.getLogger(__name__)
@@ -111,9 +117,7 @@ async def scan_card(
             logger.info("Auto-registered employee %s (UID %s)", employee.name, body.uid)
         except IntegrityError:
             await db.rollback()
-            result = await db.execute(
-                select(Employee).where(Employee.rfid_uid == body.uid)
-            )
+            result = await db.execute(select(Employee).where(Employee.rfid_uid == body.uid))
             employee = result.scalar_one()
             logger.info("Race condition handled for UID %s", body.uid)
 
@@ -137,9 +141,7 @@ async def scan_card(
         if last_ts.tzinfo is None:
             last_ts = last_ts.replace(tzinfo=timezone.utc)
 
-        if (
-            datetime.now(timezone.utc) - last_ts
-        ).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
+        if (datetime.now(timezone.utc) - last_ts).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
             return ScanResponse(
                 success=True,
                 event=last_event.event_type,
@@ -208,9 +210,7 @@ async def scan_card(
 
 
 # ── Break endpoints ─────────────────────────────────────────────────
-async def _record_break_event(
-    uid: str, event_type: str, db: AsyncSession
-) -> BreakResponse:
+async def _record_break_event(uid: str, event_type: str, db: AsyncSession) -> BreakResponse:
     """Internal helper to record BREAK_START or BREAK_END events."""
     result = await db.execute(select(Employee).where(Employee.rfid_uid == uid))
     employee = result.scalar_one_or_none()
@@ -286,9 +286,7 @@ async def create_employee(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> Employee:
-    existing = await db.execute(
-        select(Employee).where(Employee.rfid_uid == body.rfid_uid)
-    )
+    existing = await db.execute(select(Employee).where(Employee.rfid_uid == body.rfid_uid))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=400,

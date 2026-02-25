@@ -23,15 +23,14 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["CORS_ORIGINS"] = '["*"]'
 
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.api.v1.deps import get_db
 from app.db.base import Base
-from app.db.session import \
-    engine as \
-    app_engine  # noqa: F401 — retained for engine patching if needed
+from app.db.session import (  # noqa: F401 — retained for engine patching if needed
+    engine as app_engine,
+)
 from app.main import app
 
 # Actually, since we set env var before import, app.db.session should pick it up.
@@ -100,6 +99,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 from app.api.v1.deps import get_current_active_user, require_admin
+
 # ── Auth Overrides ──────────────────────────────────────────────────
 from app.models.user import User
 

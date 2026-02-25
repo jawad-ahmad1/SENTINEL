@@ -23,9 +23,7 @@ async def test_break_end_requires_registered_employee(async_client: AsyncClient)
 async def test_break_start_for_known_employee(async_client: AsyncClient):
     """Break start for a registered employee should succeed."""
     # Register employee first
-    await async_client.post(
-        "/api/v1/employees", json={"name": "Breaker", "rfid_uid": "BRK-001"}
-    )
+    await async_client.post("/api/v1/employees", json={"name": "Breaker", "rfid_uid": "BRK-001"})
     resp = await async_client.post("/api/v1/break/start", json={"uid": "BRK-001"})
     assert resp.status_code == 200
     data = resp.json()
@@ -37,9 +35,7 @@ async def test_break_start_for_known_employee(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_break_end_for_known_employee(async_client: AsyncClient):
     """Break end for a registered employee should succeed."""
-    await async_client.post(
-        "/api/v1/employees", json={"name": "Ender", "rfid_uid": "BRK-002"}
-    )
+    await async_client.post("/api/v1/employees", json={"name": "Ender", "rfid_uid": "BRK-002"})
     await async_client.post("/api/v1/break/start", json={"uid": "BRK-002"})
     resp = await async_client.post("/api/v1/break/end", json={"uid": "BRK-002"})
     assert resp.status_code == 200

@@ -61,9 +61,7 @@ async def test_scan_rejects_empty_uid(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_scan_rejects_invalid_uid(async_client: AsyncClient):
     """UID with special characters should be rejected."""
-    resp = await async_client.post(
-        "/api/v1/scan", json={"uid": "<script>alert(1)</script>"}
-    )
+    resp = await async_client.post("/api/v1/scan", json={"uid": "<script>alert(1)</script>"})
     assert resp.status_code == 422
 
 

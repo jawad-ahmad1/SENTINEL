@@ -12,9 +12,7 @@ BASE_URL = "http://127.0.0.1:8000/api/v1"
 
 
 def generate_garbage(length=1000):
-    return "".join(
-        random.choices(string.ascii_letters + string.digits + "!@#$%^&*()", k=length)
-    )
+    return "".join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*()", k=length))
 
 
 def generate_massive_payload():
@@ -39,9 +37,7 @@ async def attack_endpoint(client, endpoint, method="GET", payload=None):
 async def run_annihilation(concurrency=100, iterations=10):
     print(f"💀 LAUNCHING ANNIHILATION: {concurrency} threads, {iterations} waves")
     async with httpx.AsyncClient(
-        limits=httpx.Limits(
-            max_keepalive_connections=concurrency, max_connections=concurrency
-        )
+        limits=httpx.Limits(max_keepalive_connections=concurrency, max_connections=concurrency)
     ) as client:
         for flame in range(iterations):
             tasks = []
@@ -51,9 +47,7 @@ async def run_annihilation(concurrency=100, iterations=10):
             for _ in range(concurrency):
                 # 1. Scan Attack (POST /scan)
                 tasks.append(
-                    attack_endpoint(
-                        client, "/scan", "POST", {"uid": generate_garbage(50)}
-                    )
+                    attack_endpoint(client, "/scan", "POST", {"uid": generate_garbage(50)})
                 )
 
                 # 2. Login Attack (POST /auth/login) - URL Encoded manually handled by httpx if data passed, but we use json here which fails validation -> good test

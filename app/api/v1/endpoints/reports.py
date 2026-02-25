@@ -25,15 +25,23 @@ from app.models.absence_override import AbsenceOverride
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
-from app.schemas.attendance import (VALID_OVERRIDE_STATUSES, AbsenceDayDetail,
-                                    AbsenceEmployeeDetail,
-                                    AbsenceOverrideCreate, AbsenceOverrideRead,
-                                    AbsenceReportResponse, AttendanceFeedItem,
-                                    DailySummaryResponse,
-                                    EmployeeAnalyticsResponse,
-                                    EmployeeMonthAbsence, HealthResponse,
-                                    LiveStatsResponse, MonthlyReportResponse,
-                                    StatusResponse, TrendsResponse)
+from app.schemas.attendance import (
+    VALID_OVERRIDE_STATUSES,
+    AbsenceDayDetail,
+    AbsenceEmployeeDetail,
+    AbsenceOverrideCreate,
+    AbsenceOverrideRead,
+    AbsenceReportResponse,
+    AttendanceFeedItem,
+    DailySummaryResponse,
+    EmployeeAnalyticsResponse,
+    EmployeeMonthAbsence,
+    HealthResponse,
+    LiveStatsResponse,
+    MonthlyReportResponse,
+    StatusResponse,
+    TrendsResponse,
+)
 
 router = APIRouter(tags=["reports"])
 logger = logging.getLogger(__name__)
@@ -139,11 +147,7 @@ async def reports_summary(
             None,
         )
         last_out = next(
-            (
-                e.timestamp.isoformat()
-                for e in reversed(events)
-                if e.event_type == "OUT"
-            ),
+            (e.timestamp.isoformat() for e in reversed(events) if e.event_type == "OUT"),
             None,
         )
         details.append(
@@ -157,9 +161,7 @@ async def reports_summary(
             }
         )
 
-    return DailySummaryResponse(
-        date=date_str, total_employees=len(details), details=details
-    )
+    return DailySummaryResponse(date=date_str, total_employees=len(details), details=details)
 
 
 # ── Daily CSV ─────────────────────────────────────────────────────
@@ -193,9 +195,7 @@ async def daily_csv(
     def iter_csv():
         yield "employee_id,name,date,first_in,last_out,work_hours\n"
         for emp_id, events in by_emp.items():
-            first_in_ts = next(
-                (e.timestamp for e in events if e.event_type == "IN"), None
-            )
+            first_in_ts = next((e.timestamp for e in events if e.event_type == "IN"), None)
             last_out_ts = next(
                 (e.timestamp for e in reversed(events) if e.event_type == "OUT"),
                 None,
@@ -206,9 +206,7 @@ async def daily_csv(
     return StreamingResponse(
         iter_csv(),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=attendance_{date_str}.csv"
-        },
+        headers={"Content-Disposition": f"attachment; filename=attendance_{date_str}.csv"},
     )
 
 
@@ -243,9 +241,7 @@ async def monthly_report(
     )
     rows = result.all()
 
-    by_emp: dict[int, dict[str, list[Attendance]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    by_emp: dict[int, dict[str, list[Attendance]]] = defaultdict(lambda: defaultdict(list))
     names: dict[int, str] = {}
     for att, name in rows:
         by_emp[att.employee_id][att.date].append(att)
@@ -307,9 +303,7 @@ async def analytics_trends(
 
 
 # ── Employee Analytics (N+1 FIXED — single query for 30 days) ──────
-@router.get(
-    "/analytics/employee/{employee_id}", response_model=EmployeeAnalyticsResponse
-)
+@router.get("/analytics/employee/{employee_id}", response_model=EmployeeAnalyticsResponse)
 async def employee_analytics(
     employee_id: int,
     db: AsyncSession = Depends(get_db),
@@ -419,7 +413,7 @@ async def absence_report(
     _user: User = Depends(get_current_active_user),
 ) -> AbsenceReportResponse:
     """Generate a monthly absence report with daily breakdown and employee details."""
-    import calendar as cal_mod
+    # Use module-level 'calendar' import (avoid W0404 reimport)
 
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be 1-12")
@@ -435,7 +429,7 @@ async def absence_report(
         return AbsenceReportResponse(
             year=year,
             month=month,
-            month_name=cal_mod.month_name[month],
+            month_name=calendar.month_name[month],
             total_working_days=0,
             total_employees=0,
             total_absences=0,
@@ -447,7 +441,7 @@ async def absence_report(
         )
 
     # Determine working days (Mon-Fri) in the month
-    _, days_in_month = cal_mod.monthrange(year, month)
+    _, days_in_month = calendar.monthrange(year, month)
     working_days = []
     for day in range(1, days_in_month + 1):
         d = date(year, month, day)
@@ -463,7 +457,7 @@ async def absence_report(
         return AbsenceReportResponse(
             year=year,
             month=month,
-            month_name=cal_mod.month_name[month],
+            month_name=calendar.month_name[month],
             total_working_days=0,
             total_employees=total_employees,
             total_absences=0,
@@ -501,9 +495,7 @@ async def absence_report(
         present = len(present_ids)
         absent = total_employees - present
         total_absences += absent
-        absence_rate = (
-            round((absent / total_employees) * 100, 1) if total_employees > 0 else 0.0
-        )
+        absence_rate = round((absent / total_employees) * 100, 1) if total_employees > 0 else 0.0
 
         daily_breakdown.append(
             AbsenceDayDetail(
@@ -556,9 +548,7 @@ async def absence_report(
             continue
 
         emp_overrides = {
-            d: override_map[emp.id][d]
-            for d in absent_dates
-            if d in override_map.get(emp.id, {})
+            d: override_map[emp.id][d] for d in absent_dates if d in override_map.get(emp.id, {})
         }
 
         # Calculate real absence days: skip working overrides, separate leaves and half days
@@ -610,9 +600,7 @@ async def absence_report(
     concerning_absences.sort(key=lambda x: x.days_absent, reverse=True)
 
     overall_absence_rate = (
-        round(
-            (adjusted_total_absences / (total_employees * total_working_days)) * 100, 1
-        )
+        round((adjusted_total_absences / (total_employees * total_working_days)) * 100, 1)
         if (total_employees * total_working_days) > 0
         else 0.0
     )
@@ -620,7 +608,7 @@ async def absence_report(
     return AbsenceReportResponse(
         year=year,
         month=month,
-        month_name=cal_mod.month_name[month],
+        month_name=calendar.month_name[month],
         total_working_days=total_working_days,
         total_employees=total_employees,
         total_absences=adjusted_total_absences,
@@ -696,10 +684,10 @@ async def live_stats(
             work_start = att_settings.work_start
             grace_minutes = att_settings.grace_minutes
             tz_offset = att_settings.timezone_offset
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not load attendance settings for live-stats: %s", exc)
 
-    for emp_id, events in employee_events.items():
+    for _emp_id, events in employee_events.items():
         sorted_events = sorted(events, key=lambda e: e.timestamp)
         last_event = sorted_events[-1]
         if last_event.event_type == "IN":
@@ -716,9 +704,7 @@ async def live_stats(
             offset_parts = tz_offset[1:].split(":")
             offset_hours = int(offset_parts[0])
             offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
-            local_offset = timedelta(
-                hours=sign * offset_hours, minutes=sign * offset_mins
-            )
+            local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
             local_tz = timezone(local_offset)
             local_time = ts.astimezone(local_tz)
 
@@ -750,8 +736,8 @@ async def live_stats(
             r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         await r.setex("sentinel:live_stats", 15, result.model_dump_json())
         await r.aclose()
-    except Exception:
-        pass  # Redis write failure is non-critical
+    except Exception:  # noqa: BLE001
+        logger.debug("Redis write failure for live_stats cache — non-critical")
 
     return result
 
@@ -760,16 +746,10 @@ async def live_stats(
 @router.delete("/attendance/clear")
 async def clear_attendance(
     scope: str = Query(default="all", description="Scope: all, date, range, employee"),
-    date_str: str | None = Query(
-        default=None, description="Date (YYYY-MM-DD) for scope=date"
-    ),
-    date_from: str | None = Query(
-        default=None, description="Start date for scope=range"
-    ),
+    date_str: str | None = Query(default=None, description="Date (YYYY-MM-DD) for scope=date"),
+    date_from: str | None = Query(default=None, description="Start date for scope=range"),
     date_to: str | None = Query(default=None, description="End date for scope=range"),
-    employee_id: int | None = Query(
-        default=None, description="Employee ID for scope=employee"
-    ),
+    employee_id: int | None = Query(default=None, description="Employee ID for scope=employee"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -785,9 +765,7 @@ async def clear_attendance(
 
     if scope == "date":
         if not date_str:
-            raise HTTPException(
-                status_code=400, detail="date_str required for scope=date"
-            )
+            raise HTTPException(status_code=400, detail="date_str required for scope=date")
         stmt = stmt.where(Attendance.date == date_str)
     elif scope == "range":
         if not date_from or not date_to:
@@ -797,9 +775,7 @@ async def clear_attendance(
         stmt = stmt.where(Attendance.date >= date_from, Attendance.date <= date_to)
     elif scope == "employee":
         if not employee_id:
-            raise HTTPException(
-                status_code=400, detail="employee_id required for scope=employee"
-            )
+            raise HTTPException(status_code=400, detail="employee_id required for scope=employee")
         stmt = stmt.where(Attendance.employee_id == employee_id)
     elif scope != "all":
         raise HTTPException(status_code=400, detail=f"Unknown scope: {scope}")
@@ -906,9 +882,7 @@ async def delete_absence_override(
     _admin: User = Depends(require_admin),
 ):
     """Delete a specific absence override."""
-    result = await db.execute(
-        select(AbsenceOverride).where(AbsenceOverride.id == override_id)
-    )
+    result = await db.execute(select(AbsenceOverride).where(AbsenceOverride.id == override_id))
     override = result.scalar_one_or_none()
     if not override:
         raise HTTPException(status_code=404, detail="Override not found")
@@ -931,7 +905,7 @@ async def employee_absence_detail(
     _user: User = Depends(get_current_active_user),
 ) -> EmployeeMonthAbsence:
     """Get absence details for a single employee in a given month."""
-    import calendar as cal_mod
+    # Use module-level 'calendar' import (avoid W0404 reimport)
 
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be 1-12")
@@ -943,7 +917,7 @@ async def employee_absence_detail(
         raise HTTPException(status_code=404, detail="Employee not found")
 
     # Working days
-    _, days_in_month = cal_mod.monthrange(year, month)
+    _, days_in_month = calendar.monthrange(year, month)
     working_days = []
     for day in range(1, days_in_month + 1):
         d = date(year, month, day)
@@ -968,9 +942,7 @@ async def employee_absence_detail(
     present_dates = {a.date for a in att_result.scalars().all()}
 
     absent_dates = [
-        d.strftime("%Y-%m-%d")
-        for d in working_days
-        if d.strftime("%Y-%m-%d") not in present_dates
+        d.strftime("%Y-%m-%d") for d in working_days if d.strftime("%Y-%m-%d") not in present_dates
     ]
 
     # Overrides
@@ -1000,9 +972,7 @@ async def employee_absence_detail(
             real_absent += 1.0
 
     days_present = total_working - real_absent - real_leave - real_half_day
-    attendance_rate = (
-        round((days_present / total_working) * 100, 1) if total_working > 0 else 0.0
-    )
+    attendance_rate = round((days_present / total_working) * 100, 1) if total_working > 0 else 0.0
 
     return EmployeeMonthAbsence(
         employee_id=emp.id,
@@ -1010,7 +980,7 @@ async def employee_absence_detail(
         department=emp.department,
         year=year,
         month=month,
-        month_name=cal_mod.month_name[month],
+        month_name=calendar.month_name[month],
         working_days=total_working,
         days_present=float(days_present),
         days_absent=float(real_absent),

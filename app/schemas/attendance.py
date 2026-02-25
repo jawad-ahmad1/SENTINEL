@@ -21,9 +21,7 @@ class ScanRequest(BaseModel):
         if not v:
             raise ValueError("UID must not be empty")
         if not _UID_RE.match(v):
-            raise ValueError(
-                "UID must be 2-64 alphanumeric chars (colons / hyphens allowed)"
-            )
+            raise ValueError("UID must be 2-64 alphanumeric chars (colons / hyphens allowed)")
         return v
 
 

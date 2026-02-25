@@ -16,8 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_db, require_admin
 from app.models.attendance_settings import AttendanceSettings
 from app.models.user import User
-from app.schemas.attendance import (AttendanceSettingsRead,
-                                    AttendanceSettingsUpdate)
+from app.schemas.attendance import AttendanceSettingsRead, AttendanceSettingsUpdate
 
 router = APIRouter(tags=["settings"])
 logger = logging.getLogger(__name__)

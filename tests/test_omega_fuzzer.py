@@ -9,9 +9,7 @@ from httpx import AsyncClient
 
 
 def generate_garbage(length=100):
-    return "".join(
-        random.choices(string.ascii_letters + string.digits + "!@#$%^&*()", k=length)
-    )
+    return "".join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*()", k=length))
 
 
 def generate_sql_injection():

@@ -50,8 +50,10 @@ const AUTH = {
         } catch (e) {
             console.error('Logout failed', e);
         }
-        localStorage.clear();
-        sessionStorage.clear();
+        localStorage.removeItem(this.LOGGED_IN_KEY);
+        localStorage.removeItem(this.USER_ROLE_KEY);
+        sessionStorage.removeItem(this.LOGGED_IN_KEY);
+        sessionStorage.removeItem(this.USER_ROLE_KEY);
         window.location.href = redirectUrl;
     },
 
@@ -97,12 +99,6 @@ const AUTH = {
      * Returns the user profile on success.
      */
     async requireAuth() {
-        // Quick client-side pre-check (avoids network call for obviously unauthenticated users)
-        if (!this.isLoggedIn()) {
-            const redirect = encodeURIComponent(window.location.href);
-            window.location.href = `login.html?redirect=${redirect}`;
-            return null;
-        }
         try {
             const res = await fetch(`${this.API_BASE}/api/v1/auth/me`, {
                 credentials: 'include'
@@ -134,11 +130,6 @@ const AUTH = {
         // Immediately hide page content to prevent flash
         document.documentElement.style.visibility = 'hidden';
 
-        // Quick client-side pre-check
-        if (!this.isLoggedIn()) {
-            window.location.href = 'login.html';
-            return null;
-        }
         try {
             const res = await fetch(`${this.API_BASE}/api/v1/auth/me`, {
                 credentials: 'include'

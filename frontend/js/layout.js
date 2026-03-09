@@ -34,7 +34,9 @@ const Layout = {
     },
 
     injectStyles() {
+        if (document.getElementById('layout-anim-styles')) return;
         const style = document.createElement('style');
+        style.id = 'layout-anim-styles';
         style.textContent = `
             .main-content { opacity: 0; }
             .animate-enter { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -90,17 +92,28 @@ const Layout = {
     },
 
     renderHeader(container) {
-        container.innerHTML = `
-            <header class="header">
-                <div>
-                    <h1>${this.config.title}</h1>
-                    <p>${this.config.subtitle}</p>
-                </div>
-                <div>
-                    ${this.config.actions || ''}
-                </div>
-            </header>
-        `;
+        container.textContent = '';
+
+        const header = document.createElement('header');
+        header.className = 'header';
+
+        const textBlock = document.createElement('div');
+        const h1 = document.createElement('h1');
+        h1.textContent = this.config.title || '';
+        const subtitle = document.createElement('p');
+        subtitle.textContent = this.config.subtitle || '';
+        textBlock.appendChild(h1);
+        textBlock.appendChild(subtitle);
+
+        const actionBlock = document.createElement('div');
+        if (this.config.actions) {
+            // Actions are controlled by page templates (trusted app-owned markup).
+            actionBlock.innerHTML = this.config.actions;
+        }
+
+        header.appendChild(textBlock);
+        header.appendChild(actionBlock);
+        container.appendChild(header);
     }
 };
 

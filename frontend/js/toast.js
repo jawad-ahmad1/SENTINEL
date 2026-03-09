@@ -86,7 +86,16 @@
     window.showToast = function (message, type = 'success', duration = 3500) {
         const toast = document.createElement('div');
         toast.className = `sentinel-toast toast-${type}`;
-        toast.innerHTML = `<span class="toast-icon">${ICONS[type] || ''}</span><span>${message}</span>`;
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'toast-icon';
+        iconSpan.textContent = ICONS[type] || '';
+
+        const messageSpan = document.createElement('span');
+        messageSpan.textContent = String(message ?? '');
+
+        toast.appendChild(iconSpan);
+        toast.appendChild(messageSpan);
         container.appendChild(toast);
 
         // Trigger animation

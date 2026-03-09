@@ -17,15 +17,15 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.security import get_password_hash
-from app.db.base import Base
 from app.db.session import async_session_factory, engine
 
-# Ensure all models are imported so metadata.create_all can see them
+# Ensure all models are imported for metadata and startup checks.
 from app.models.absence_override import AbsenceOverride  # noqa: F401
 from app.models.attendance_settings import AttendanceSettings  # noqa: F401
 from app.models.employee import Attendance, Employee  # noqa: F401
@@ -41,31 +41,49 @@ logger = logging.getLogger(__name__)
 # ── Lifespan ────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables initialised")
+    if settings.AUTO_CREATE_SCHEMA:
+        from app.db.base import Base
 
-    # Seed default admin user on first run
-    async with async_session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.email == settings.FIRST_ADMIN_EMAIL)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.warning(
+            "AUTO_CREATE_SCHEMA is enabled. Prefer Alembic migrations for production."
         )
-        if result.scalar_one_or_none() is None:
-            admin = User(
-                email=settings.FIRST_ADMIN_EMAIL,
-                hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD),
-                full_name="System Administrator",
-                role="admin",
-            )
-            session.add(admin)
-            await session.commit()
-            logger.info(
-                "Default admin created: %s (password: <redacted>)",
-                settings.FIRST_ADMIN_EMAIL,
-            )
 
-    logger.info("🚀 Sentinel v%s started", settings.VERSION)
+    if settings.FIRST_ADMIN_PASSWORD == "changeme123":
+        logger.warning(
+            "Insecure default admin password is configured. Change FIRST_ADMIN_PASSWORD."
+        )
+
+    # Seed default admin user on first run.
+    # If migrations were not applied yet, we warn and continue startup.
+    try:
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(User).where(
+                    User.email == settings.FIRST_ADMIN_EMAIL.strip().lower()
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                admin = User(
+                    email=settings.FIRST_ADMIN_EMAIL.strip().lower(),
+                    hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD),
+                    full_name="System Administrator",
+                    role="admin",
+                )
+                session.add(admin)
+                await session.commit()
+                logger.info(
+                    "Default admin created: %s (password: <redacted>)",
+                    settings.FIRST_ADMIN_EMAIL,
+                )
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Default admin seed skipped because database schema is not ready: %s",
+            exc,
+        )
+
+    logger.info("Sentinel v%s started", settings.VERSION)
     yield
     await engine.dispose()
     logger.info("Shutdown complete")

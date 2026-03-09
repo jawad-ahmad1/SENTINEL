@@ -22,8 +22,8 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [3/3] Running Migrations...
-docker compose exec app alembic upgrade head
+echo [3/3] Verifying Service Health...
+docker compose ps
 
 echo.
 echo ===================================================
@@ -33,9 +33,8 @@ echo.
 echo Frontend: http://localhost
 echo API Docs: http://localhost/docs
 echo.
-echo Credentials (Production):
-echo   User: admin@attendance.local
-echo   Pass: changeme123
+echo Credentials:
+echo   Use FIRST_ADMIN_EMAIL / FIRST_ADMIN_PASSWORD from .env
 echo.
 echo To stop: Type command 'docker compose down'
 pause

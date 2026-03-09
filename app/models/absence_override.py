@@ -9,7 +9,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 
 from app.db.base import Base
 
@@ -19,6 +28,11 @@ class AbsenceOverride(Base):
     __table_args__ = (
         UniqueConstraint("employee_id", "date", name="uq_override_emp_date"),
         Index("ix_override_employee_date", "employee_id", "date"),
+        Index("ix_override_date", "date"),
+        CheckConstraint(
+            "status IN ('LEAVE', 'BUSINESS_TRIP', 'WORK_FROM_HOME', 'HALF_DAY', 'SUPPLIER_VISIT')",
+            name="ck_override_status",
+        ),
     )
 
     id: int = Column(Integer, primary_key=True, index=True)  # type: ignore[assignment]

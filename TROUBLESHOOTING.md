@@ -98,7 +98,7 @@ Common issues and their solutions, organized by category.
 **Symptoms:** Login page shows "Invalid credentials"
 
 **Solutions:**
-1. Verify credentials match `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` in `.env`
+1. Verify credentials match `FIRST_ADMIN_EMAIL` / `FIRST_ADMIN_PASSWORD` in `.env`
 2. Check that the admin user was seeded (first startup creates it)
 3. Clear browser cookies and try again
 4. Check API logs: `docker compose logs app | tail -20`

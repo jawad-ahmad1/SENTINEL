@@ -71,7 +71,7 @@ curl -X POST "http://localhost/api/v1/auth/logout" -b cookies.txt
 
 Get the currently authenticated user.
 
-**Auth:** Required
+**Auth:** Public
 
 ```bash
 curl "http://localhost/api/v1/auth/me" -b cookies.txt

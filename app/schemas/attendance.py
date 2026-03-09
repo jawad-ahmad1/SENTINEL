@@ -8,6 +8,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 _UID_RE = re.compile(r"^[A-Za-z0-9:_-]{2,64}$")
+_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_TZ_OFFSET_RE = re.compile(r"^[+-](?:0\d|1\d|2[0-3]):[0-5]\d$")
 
 
 # ── Scan ────────────────────────────────────────────────────────────
@@ -230,6 +232,35 @@ class AttendanceSettingsUpdate(BaseModel):
     allowed_half_day: int | None = None
     timezone_offset: str | None = None
 
+    @field_validator("work_start", "work_end")
+    @classmethod
+    def _validate_time_fields(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        value = v.strip()
+        if not _TIME_RE.match(value):
+            raise ValueError("Time must be in HH:MM 24-hour format")
+        return value
+
+    @field_validator("timezone_offset")
+    @classmethod
+    def _validate_tz_offset(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        value = v.strip()
+        if not _TZ_OFFSET_RE.match(value):
+            raise ValueError("Timezone offset must be in ±HH:MM format")
+        return value
+
+    @field_validator("grace_minutes", "allowed_absent", "allowed_leave", "allowed_half_day")
+    @classmethod
+    def _validate_non_negative_int(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("Value must be >= 0")
+        return v
+
 
 # ── Live Stats ─────────────────────────────────────────────────────
 class LiveStatsResponse(BaseModel):
@@ -291,6 +322,25 @@ class AbsenceOverrideCreate(BaseModel):
     date: str  # YYYY-MM-DD
     status: str  # Must be in VALID_OVERRIDE_STATUSES
     notes: str | None = None
+
+    @field_validator("date")
+    @classmethod
+    def _validate_override_date(cls, v: str) -> str:
+        value = v.strip()
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError("date must be a valid YYYY-MM-DD value") from exc
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def _validate_override_status(cls, v: str) -> str:
+        value = v.strip().upper()
+        if value not in VALID_OVERRIDE_STATUSES:
+            allowed = ", ".join(VALID_OVERRIDE_STATUSES)
+            raise ValueError(f"status must be one of: {allowed}")
+        return value
 
 
 class AbsenceOverrideRead(BaseModel):

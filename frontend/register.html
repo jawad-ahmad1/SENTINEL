@@ -162,7 +162,11 @@
     });
 
     function showMessage(text, kind = 'success') {
-      messageArea.innerHTML = `<div class="msg ${kind}">${text}</div>`;
+      const kindClass = kind === 'error' ? 'error' : 'success';
+      const msg = document.createElement('div');
+      msg.className = `msg ${kindClass}`;
+      msg.textContent = String(text || '');
+      messageArea.replaceChildren(msg);
     }
 
     function setStatus(t) { status.textContent = t; }

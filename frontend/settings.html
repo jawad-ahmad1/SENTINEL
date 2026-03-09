@@ -269,7 +269,9 @@
     <script src="js/layout.js"></script>
     <script src="js/toast.js"></script>
     <script>
-        const API_BASE = window.API_BASE || '';
+        const API_BASE = window.location.origin && window.location.protocol !== 'file:'
+            ? window.location.origin
+            : 'http://127.0.0.1:8000';
 
         // Initialize layout immediately so sidebar renders
         Layout.init({
@@ -288,7 +290,7 @@
 
         async function loadSettings() {
             try {
-                const res = await fetch(`${API_BASE}/api/v1/settings`, { credentials: 'include' });
+                const res = await AUTH.fetch(`${API_BASE}/api/v1/settings`);
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('workStart').value = data.work_start || '09:00';
@@ -332,10 +334,9 @@
                     timezone_offset: document.getElementById('tzOffset').value,
                 };
 
-                const res = await fetch(`${API_BASE}/api/v1/settings`, {
+                const res = await AUTH.fetch(`${API_BASE}/api/v1/settings`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
                     body: JSON.stringify(body),
                 });
 

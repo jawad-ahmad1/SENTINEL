@@ -159,8 +159,8 @@ chmod 600 .env
 | `BOUNCE_WINDOW_SECONDS` | `2` | Anti-double-tap threshold |
 | `COOKIE_SECURE` | `true` | Set `true` for HTTPS production |
 | `CORS_ORIGINS` | `["https://attendance.company.com"]` | Allowed origins (JSON array) |
-| `DEFAULT_ADMIN_EMAIL` | `admin@company.com` | Auto-seeded admin email |
-| `DEFAULT_ADMIN_PASSWORD` | `<strong-password>` | Auto-seeded admin password (**change this**) |
+| `FIRST_ADMIN_EMAIL` | `admin@company.com` | Auto-seeded admin email |
+| `FIRST_ADMIN_PASSWORD` | `<strong-password>` | Auto-seeded admin password (**change this**) |
 
 > [!CAUTION]
 > Never commit the `.env` file to version control. The `.gitignore` excludes it by default.
@@ -300,7 +300,7 @@ docker compose exec app pip install aiosqlite
 # Run tests
 docker compose exec app python -m pytest tests/ -v --tb=short
 
-# Expected: 32 tests passed
+# Expected: all tests passed
 #   test_scan.py         - 5 passed
 #   test_employees.py    - 8 passed
 #   test_breaks.py       - 5 passed

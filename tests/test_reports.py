@@ -70,6 +70,16 @@ async def test_reports_daily_csv(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_reports_daily_csv_sanitizes_formula_cells(async_client: AsyncClient):
+    """CSV export should neutralize spreadsheet formula payloads."""
+    await _seed_employee_with_scans(async_client, uid="CSV-001", name="=2+3")
+    today = _utc_today()
+    resp = await async_client.get(f"/api/v1/reports/daily/csv?date_str={today}")
+    assert resp.status_code == 200
+    assert "'=2+3" in resp.text
+
+
+@pytest.mark.asyncio
 async def test_monthly_report(async_client: AsyncClient):
     """GET /reports/monthly/{year}/{month} should return monthly data."""
     await _seed_employee_with_scans(async_client)
@@ -133,3 +143,9 @@ async def test_status_endpoint(async_client: AsyncClient):
     data = resp.json()
     assert "total_employees" in data
     assert "today_scans" in data
+
+
+@pytest.mark.asyncio
+async def test_reports_summary_rejects_invalid_date(async_client: AsyncClient):
+    resp = await async_client.get("/api/v1/reports/summary/not-a-date")
+    assert resp.status_code == 422

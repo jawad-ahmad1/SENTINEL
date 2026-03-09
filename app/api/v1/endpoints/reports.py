@@ -8,10 +8,13 @@ fetches all events in **one** SQL query and aggregates in Python.
 from __future__ import annotations
 
 import calendar
+import csv
+import io
 import json
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -21,6 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
 from app.core.config import settings
+from app.core.timeutils import (
+    business_date_str,
+    ensure_utc,
+    is_late_arrival,
+    parse_iso_date,
+    utc_now,
+)
 from app.models.absence_override import AbsenceOverride
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
@@ -45,16 +55,48 @@ from app.schemas.attendance import (
 
 router = APIRouter(tags=["reports"])
 logger = logging.getLogger(__name__)
+_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
 def _ensure_utc(dt: datetime | None) -> datetime:
     """Normalise a potentially-naive timestamp to UTC-aware."""
-    if dt is None:
-        return datetime.now(timezone.utc)
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
+    return ensure_utc(dt)
+
+
+def _safe_csv_cell(value: object) -> str:
+    """
+    Sanitize CSV cells to avoid formula injection and malformed row content.
+    """
+    if value is None:
+        return ""
+    text = str(value).replace("\r", " ").replace("\n", " ").strip()
+    if text and text[0] in ("=", "+", "-", "@"):
+        return f"'{text}"
+    return text
+
+
+async def _get_timezone_offset(db: AsyncSession) -> str:
+    """
+    Resolve the business timezone offset from attendance settings.
+    Falls back to +05:00 when settings are not initialized.
+    """
+    try:
+        result = await db.execute(select(AttendanceSettings.timezone_offset).limit(1))
+        offset = result.scalar_one_or_none()
+        return offset or "+05:00"
+    except Exception:  # noqa: BLE001
+        return "+05:00"
+
+
+def _validate_date_input(date_str: str, *, field_name: str = "date_str") -> str:
+    try:
+        return parse_iso_date(date_str).isoformat()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field_name} must be a valid YYYY-MM-DD date",
+        ) from exc
 
 
 def _calc_duration(events: list[Attendance]) -> float:
@@ -97,7 +139,8 @@ async def attendance_today(
     db: AsyncSession = Depends(get_db),
 ) -> list[AttendanceFeedItem]:
     """Return today's attendance events for the kiosk live feed."""
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    tz_offset = await _get_timezone_offset(db)
+    today_str = business_date_str(tz_offset, utc_now())
     result = await db.execute(
         select(Attendance, Employee.name)
         .join(Employee, Attendance.employee_id == Employee.id)
@@ -126,6 +169,7 @@ async def reports_summary(
     _user: User = Depends(get_current_active_user),
 ) -> DailySummaryResponse:
     """Generate a daily summary with work hours per employee."""
+    date_str = _validate_date_input(date_str)
     result = await db.execute(
         select(Attendance, Employee.name)
         .join(Employee, Attendance.employee_id == Employee.id)
@@ -172,6 +216,7 @@ async def daily_csv(
     _user: User = Depends(get_current_active_user),
 ) -> StreamingResponse:
     """Export daily attendance as a CSV file download."""
+    date_str = _validate_date_input(date_str)
     result = await db.execute(
         select(Attendance, Employee.name)
         .join(Employee, Attendance.employee_id == Employee.id)
@@ -190,10 +235,16 @@ async def daily_csv(
         """Format a timestamp to readable HH:MM AM/PM."""
         if ts is None:
             return ""
-        return ts.strftime("%I:%M %p")
+        return ensure_utc(ts).strftime("%I:%M %p")
 
     def iter_csv():
-        yield "employee_id,name,date,first_in,last_out,work_hours\n"
+        header_stream = io.StringIO()
+        writer = csv.writer(header_stream)
+        writer.writerow(
+            ["employee_id", "name", "date", "first_in", "last_out", "work_hours"]
+        )
+        yield header_stream.getvalue()
+
         for emp_id, events in by_emp.items():
             first_in_ts = next((e.timestamp for e in events if e.event_type == "IN"), None)
             last_out_ts = next(
@@ -201,7 +252,19 @@ async def daily_csv(
                 None,
             )
             hours = round(_calc_duration(events), 2)
-            yield f"{emp_id},{names[emp_id]},{date_str},{_fmt_time(first_in_ts)},{_fmt_time(last_out_ts)},{hours}\n"
+            row_stream = io.StringIO()
+            writer = csv.writer(row_stream)
+            writer.writerow(
+                [
+                    _safe_csv_cell(emp_id),
+                    _safe_csv_cell(names[emp_id]),
+                    _safe_csv_cell(date_str),
+                    _safe_csv_cell(_fmt_time(first_in_ts)),
+                    _safe_csv_cell(_fmt_time(last_out_ts)),
+                    _safe_csv_cell(hours),
+                ]
+            )
+            yield row_stream.getvalue()
 
     return StreamingResponse(
         iter_csv(),
@@ -229,6 +292,10 @@ async def monthly_report(
     _user: User = Depends(get_current_active_user),
 ) -> MonthlyReportResponse:
     """Generate a monthly attendance summary per employee."""
+    if year < 1970 or year > 2100:
+        raise HTTPException(status_code=422, detail="year must be in range 1970..2100")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=422, detail="month must be in range 1..12")
     _, days_in_month = calendar.monthrange(year, month)
     start = f"{year:04d}-{month:02d}-01"
     end = f"{year:04d}-{month:02d}-{days_in_month:02d}"
@@ -276,7 +343,9 @@ async def analytics_trends(
     _user: User = Depends(get_current_active_user),
 ) -> TrendsResponse:
     """Return attendance trends over the last N days."""
-    start = (date.today() - timedelta(days=days)).isoformat()
+    tz_offset = await _get_timezone_offset(db)
+    today_local = parse_iso_date(business_date_str(tz_offset, utc_now()))
+    start = (today_local - timedelta(days=days)).isoformat()
 
     result = await db.execute(
         select(
@@ -315,7 +384,8 @@ async def employee_analytics(
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    today = date.today()
+    tz_offset = await _get_timezone_offset(db)
+    today = parse_iso_date(business_date_str(tz_offset, utc_now()))
     start = (today - timedelta(days=30)).isoformat()
 
     result = await db.execute(
@@ -388,7 +458,8 @@ async def system_status(
     _user: User = Depends(get_current_active_user),
 ) -> StatusResponse:
     """Return current system status — employee count and today's scans."""
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    tz_offset = await _get_timezone_offset(db)
+    today_str = business_date_str(tz_offset, utc_now())
 
     emp_count = await db.execute(
         select(func.count(Employee.id)).where(Employee.is_active.is_(True))
@@ -415,6 +486,8 @@ async def absence_report(
     """Generate a monthly absence report with daily breakdown and employee details."""
     # Use module-level 'calendar' import (avoid W0404 reimport)
 
+    if year < 1970 or year > 2100:
+        raise HTTPException(status_code=422, detail="Year must be in range 1970-2100")
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be 1-12")
 
@@ -448,8 +521,9 @@ async def absence_report(
         if d.weekday() < 5:  # Mon=0 ... Fri=4
             working_days.append(d)
 
-    # Only include working days up to today (don't count future days as absences)
-    today = date.today()
+    # Only include working days up to today's business date
+    tz_offset = await _get_timezone_offset(db)
+    today = parse_iso_date(business_date_str(tz_offset, utc_now()))
     working_days = [d for d in working_days if d <= today]
     total_working_days = len(working_days)
 
@@ -641,7 +715,21 @@ async def live_stats(
     except Exception:
         r = None  # Redis unavailable — fall through to DB
 
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Read attendance settings for local business-day and late calculations.
+    work_start = "09:00"
+    grace_minutes = 15
+    tz_offset = "+05:00"
+    try:
+        settings_result = await db.execute(select(AttendanceSettings).limit(1))
+        att_settings = settings_result.scalar_one_or_none()
+        if att_settings:
+            work_start = att_settings.work_start
+            grace_minutes = att_settings.grace_minutes
+            tz_offset = att_settings.timezone_offset
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not load attendance settings for live-stats: %s", exc)
+
+    today_str = business_date_str(tz_offset, utc_now())
 
     # Total active employees
     emp_result = await db.execute(
@@ -664,7 +752,6 @@ async def live_stats(
     all_today = list(att_result.scalars().all())
 
     # Group by employee — determine who is currently IN (last event = IN)
-
     employee_events: dict[int, list[Attendance]] = defaultdict(list)
     for att in all_today:
         employee_events[att.employee_id].append(att)
@@ -672,20 +759,6 @@ async def live_stats(
     present = 0
     late = 0
     on_time = 0
-
-    # Read attendance settings for late calculation
-    work_start = "09:00"
-    grace_minutes = 15
-    tz_offset = "+05:00"
-    try:
-        settings_result = await db.execute(select(AttendanceSettings).limit(1))
-        att_settings = settings_result.scalar_one_or_none()
-        if att_settings:
-            work_start = att_settings.work_start
-            grace_minutes = att_settings.grace_minutes
-            tz_offset = att_settings.timezone_offset
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Could not load attendance settings for live-stats: %s", exc)
 
     for _emp_id, events in employee_events.items():
         sorted_events = sorted(events, key=lambda e: e.timestamp)
@@ -696,25 +769,12 @@ async def live_stats(
         # Check if first IN was late
         first_in = next((e for e in sorted_events if e.event_type == "IN"), None)
         if first_in:
-            ts = first_in.timestamp
-            if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-
-            sign = 1 if tz_offset[0] == "+" else -1
-            offset_parts = tz_offset[1:].split(":")
-            offset_hours = int(offset_parts[0])
-            offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
-            local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
-            local_tz = timezone(local_offset)
-            local_time = ts.astimezone(local_tz)
-
-            start_parts = work_start.split(":")
-            start_hour, start_min = int(start_parts[0]), int(start_parts[1])
-            cutoff = local_time.replace(
-                hour=start_hour, minute=start_min, second=0, microsecond=0
-            ) + timedelta(minutes=grace_minutes)
-
-            if local_time > cutoff:
+            if is_late_arrival(
+                scan_timestamp=ensure_utc(first_in.timestamp),
+                work_start=work_start,
+                grace_minutes=grace_minutes,
+                timezone_offset=tz_offset,
+            ):
                 late += 1
             else:
                 on_time += 1
@@ -749,7 +809,7 @@ async def clear_attendance(
     date_str: str | None = Query(default=None, description="Date (YYYY-MM-DD) for scope=date"),
     date_from: str | None = Query(default=None, description="Start date for scope=range"),
     date_to: str | None = Query(default=None, description="End date for scope=range"),
-    employee_id: int | None = Query(default=None, description="Employee ID for scope=employee"),
+    employee_id: int | None = Query(default=None, ge=1, description="Employee ID for scope=employee"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -766,11 +826,19 @@ async def clear_attendance(
     if scope == "date":
         if not date_str:
             raise HTTPException(status_code=400, detail="date_str required for scope=date")
+        date_str = _validate_date_input(date_str, field_name="date_str")
         stmt = stmt.where(Attendance.date == date_str)
     elif scope == "range":
         if not date_from or not date_to:
             raise HTTPException(
                 status_code=400, detail="date_from and date_to required for scope=range"
+            )
+        date_from = _validate_date_input(date_from, field_name="date_from")
+        date_to = _validate_date_input(date_to, field_name="date_to")
+        if date_from > date_to:
+            raise HTTPException(
+                status_code=422,
+                detail="date_from must be less than or equal to date_to",
             )
         stmt = stmt.where(Attendance.date >= date_from, Attendance.date <= date_to)
     elif scope == "employee":
@@ -797,6 +865,10 @@ async def create_absence_override(
     admin: User = Depends(require_admin),
 ):
     """Create or update an absence override for a specific employee and date."""
+    emp_result = await db.execute(select(Employee.id).where(Employee.id == body.employee_id))
+    if emp_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
     if body.status not in VALID_OVERRIDE_STATUSES:
         raise HTTPException(
             status_code=400,
@@ -826,7 +898,14 @@ async def create_absence_override(
         )
         db.add(override)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as exc:  # noqa: BLE001
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to save absence override",
+        ) from exc
     await db.refresh(override)
 
     return {
@@ -840,7 +919,7 @@ async def create_absence_override(
 
 @router.get("/attendance/absence-overrides")
 async def list_absence_overrides(
-    employee_id: int | None = Query(default=None),
+    employee_id: int | None = Query(default=None, ge=1),
     month: str | None = Query(default=None, description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -855,6 +934,8 @@ async def list_absence_overrides(
     if employee_id:
         stmt = stmt.where(AbsenceOverride.employee_id == employee_id)
     if month:
+        if not _MONTH_RE.match(month):
+            raise HTTPException(status_code=422, detail="month must be in YYYY-MM format")
         stmt = stmt.where(AbsenceOverride.date.startswith(month))
 
     result = await db.execute(stmt)
@@ -907,6 +988,8 @@ async def employee_absence_detail(
     """Get absence details for a single employee in a given month."""
     # Use module-level 'calendar' import (avoid W0404 reimport)
 
+    if year < 1970 or year > 2100:
+        raise HTTPException(status_code=422, detail="Year must be in range 1970-2100")
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be 1-12")
 
@@ -924,7 +1007,8 @@ async def employee_absence_detail(
         if d.weekday() < 5:
             working_days.append(d)
 
-    today = date.today()
+    tz_offset = await _get_timezone_offset(db)
+    today = parse_iso_date(business_date_str(tz_offset, utc_now()))
     working_days = [d for d in working_days if d <= today]
     total_working = len(working_days)
 

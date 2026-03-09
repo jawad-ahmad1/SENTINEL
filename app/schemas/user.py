@@ -9,6 +9,17 @@ from pydantic import BaseModel, field_validator
 _VALID_ROLES = {"admin", "manager", "kiosk", "readonly"}
 
 
+def _validate_password_strength(value: str) -> str:
+    password = value.strip()
+    if len(password) < 10:
+        raise ValueError("Password must be at least 10 characters long")
+    if not any(c.isalpha() for c in password):
+        raise ValueError("Password must include at least one letter")
+    if not any(c.isdigit() for c in password):
+        raise ValueError("Password must include at least one digit")
+    return password
+
+
 class UserCreate(BaseModel):
     email: str
     password: str
@@ -29,6 +40,11 @@ class UserCreate(BaseModel):
         if "@" not in v:
             raise ValueError("Invalid email address")
         return v
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class UserRead(BaseModel):
@@ -54,3 +70,10 @@ class UserUpdate(BaseModel):
         if v is not None and v not in _VALID_ROLES:
             raise ValueError(f"Role must be one of: {_VALID_ROLES}")
         return v
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return _validate_password_strength(v)

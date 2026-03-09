@@ -66,8 +66,9 @@ CORS_ORIGINS=["https://attendance.company.com"]
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEFAULT_ADMIN_EMAIL` | `admin@company.com` | Seeded admin email (first startup only) |
-| `DEFAULT_ADMIN_PASSWORD` | *(required)* | Seeded admin password — **change immediately** |
+| `FIRST_ADMIN_EMAIL` | `admin@company.com` | Seeded admin email (first startup only) |
+| `FIRST_ADMIN_PASSWORD` | *(required)* | Seeded admin password — **change immediately** |
+| `AUTO_CREATE_SCHEMA` | `false` | When `true`, startup runs `create_all` (dev fallback only) |
 
 > The admin account is only created if no users exist in the database.
 
@@ -164,8 +165,12 @@ CORS_ORIGINS=["https://attendance.company.com"]
 BOUNCE_WINDOW_SECONDS=2
 
 # Admin (first start only)
-DEFAULT_ADMIN_EMAIL=admin@company.com
-DEFAULT_ADMIN_PASSWORD=MyStr0ng!P@ssw0rd
+FIRST_ADMIN_EMAIL=admin@company.com
+FIRST_ADMIN_PASSWORD=MyStr0ng!P@ssw0rd
+
+# Optional backward-compatible aliases (legacy docs)
+# DEFAULT_ADMIN_EMAIL=admin@company.com
+# DEFAULT_ADMIN_PASSWORD=MyStr0ng!P@ssw0rd
 ```
 
 ---

@@ -1,0 +1,15 @@
+﻿{
+    "generated_at_utc":  "2026-03-09T06:53:22Z",
+    "total_files":  101,
+    "text_files":  81,
+    "total_loc":  11682,
+    "avg_loc_per_text_file":  144.22,
+    "largest_file":  {
+                         "path":  "frontend/css/main.css",
+                         "loc":  980
+                     },
+    "smallest_file":  {
+                          "path":  "app/db/base.py",
+                          "loc":  4
+                      }
+}

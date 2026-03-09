@@ -125,7 +125,7 @@
         const rows = (j.details || []).map(d => `
           <tr>
             <td style="font-weight:600; color:white;">${escapeHtml(d.name)}</td>
-            <td><code style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">${d.employee_id}</code></td>
+            <td><code style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">${escapeHtml(String(d.employee_id))}</code></td>
             <td>${d.first_in ? new Date(d.first_in).toLocaleTimeString() : '-'}</td>
             <td>${d.last_out ? new Date(d.last_out).toLocaleTimeString() : '-'}</td>
             <td>${d.work_hours}</td>
@@ -236,8 +236,20 @@
       try {
         const res = await AUTH.fetch(`${API}/api/v1/employees?limit=500`);
         const list = await res.json();
-        const opts = (Array.isArray(list) ? list : (list.records || [])).map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
-        employeeSelect.innerHTML = '<option value="">-- Select employee --</option>' + opts;
+        employeeSelect.textContent = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '-- Select employee --';
+        employeeSelect.appendChild(placeholder);
+
+        (Array.isArray(list) ? list : (list.records || [])).forEach((e) => {
+          const employeeId = Number(e.id);
+          if (!Number.isInteger(employeeId) || employeeId <= 0) return;
+          const option = document.createElement('option');
+          option.value = String(employeeId);
+          option.textContent = String(e.name || `Employee ${employeeId}`);
+          employeeSelect.appendChild(option);
+        });
       } catch (e) { }
     }
 

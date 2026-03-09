@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -40,14 +41,42 @@ async def get_current_user(
 
     # Priority: Header > Cookie
     final_token = token
+    cookie_session = False
     if not final_token:
         # Try cookie (formatted as "Bearer <token>" or just "<token>")
         if access_token:
             # Our auth.py sets values as "Bearer <token>"
             if access_token.startswith("Bearer "):
-                final_token = access_token.split(" ")[1]
+                parts = access_token.split(" ", maxsplit=1)
+                if len(parts) == 2 and parts[1].strip():
+                    final_token = parts[1].strip()
             else:
-                final_token = access_token
+                final_token = access_token.strip() or None
+            cookie_session = bool(final_token)
+
+    # CSRF hardening for cookie-backed authenticated mutations.
+    if cookie_session and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        host = request.headers.get("host", "")
+        origin = request.headers.get("origin")
+        referer = request.headers.get("referer")
+
+        def _is_same_host(url: str) -> bool:
+            try:
+                parsed = urlparse(url)
+                return parsed.netloc == host
+            except ValueError:
+                return False
+
+        if origin and not _is_same_host(origin):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-site request blocked",
+            )
+        if not origin and referer and not _is_same_host(referer):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-site request blocked",
+            )
 
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -66,7 +95,12 @@ async def get_current_user(
     if user_id is None:
         raise credentials_exc
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise credentials_exc
+
+    result = await db.execute(select(User).where(User.id == user_id_int))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exc

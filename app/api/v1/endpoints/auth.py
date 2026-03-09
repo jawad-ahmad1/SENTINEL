@@ -31,6 +31,27 @@ from app.schemas.user import UserCreate, UserRead
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    cookie_common = {
+        "httponly": True,
+        "secure": settings.COOKIE_SECURE,
+        "samesite": "lax",
+        "path": "/",
+    }
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_common,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        **cookie_common,
+    )
+
+
 @router.post("/login", response_model=Token)
 @limiter.limit("5/minute")
 async def login_for_access_token(
@@ -57,24 +78,7 @@ async def login_for_access_token(
 
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
-
-    # Set HttpOnly Cookies
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        secure=settings.COOKIE_SECURE,  # Set to True in HTTPS production
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=settings.COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
+    _set_auth_cookies(response, access_token=access_token, refresh_token=refresh_token)
 
     return Token(
         access_token=access_token,
@@ -117,7 +121,15 @@ async def refresh_access_token_endpoint(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token payload",
         )
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token payload",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id_int))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise HTTPException(
@@ -127,23 +139,7 @@ async def refresh_access_token_endpoint(
 
     new_access = create_access_token(user.id)
     new_refresh = create_refresh_token(user.id)
-
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {new_access}",
-        httponly=True,
-        secure=settings.COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh,
-        httponly=True,
-        secure=settings.COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
+    _set_auth_cookies(response, access_token=new_access, refresh_token=new_refresh)
 
     return Token(
         access_token=new_access,
@@ -154,8 +150,8 @@ async def refresh_access_token_endpoint(
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(response: Response) -> LogoutResponse:
     """Clear auth cookies and end the session."""
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
     return LogoutResponse(message="Logged out")
 
 

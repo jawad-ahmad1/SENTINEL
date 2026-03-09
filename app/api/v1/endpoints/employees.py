@@ -9,7 +9,7 @@ Employee CRUD + RFID scan + break endpoints.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_active_user, get_db, require_admin
 from app.core.config import settings
+from app.core.timeutils import business_date_str, ensure_utc, is_late_arrival, utc_now
 from app.models.attendance_settings import AttendanceSettings
 from app.models.employee import Attendance, Employee
 from app.models.user import User
@@ -39,12 +40,10 @@ logger = logging.getLogger(__name__)
 def _compute_today_hours(events: list[Attendance]) -> float:
     """Calculate accumulated work hours from today's IN/OUT pairs."""
     total_seconds = 0.0
-    last_in_time = None
+    last_in_time: datetime | None = None
     # Process oldest first
     for ev in sorted(events, key=lambda e: e.timestamp):
-        ts = ev.timestamp
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+        ts = ensure_utc(ev.timestamp)
         if ev.event_type == "IN":
             last_in_time = ts
         elif ev.event_type == "OUT" and last_in_time is not None:
@@ -52,7 +51,7 @@ def _compute_today_hours(events: list[Attendance]) -> float:
             last_in_time = None
     # If currently clocked in, count up to now
     if last_in_time is not None:
-        total_seconds += (datetime.now(timezone.utc) - last_in_time).total_seconds()
+        total_seconds += (utc_now() - last_in_time).total_seconds()
     return round(total_seconds / 3600, 2)
 
 
@@ -64,27 +63,12 @@ def _check_is_late(
     if not in_events:
         return False
     first_in = sorted(in_events, key=lambda e: e.timestamp)[0]
-    ts = first_in.timestamp
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
-
-    # Parse timezone offset to convert UTC to local
-    sign = 1 if tz_offset[0] == "+" else -1
-    offset_parts = tz_offset[1:].split(":")
-    offset_hours = int(offset_parts[0])
-    offset_mins = int(offset_parts[1]) if len(offset_parts) > 1 else 0
-    local_offset = timedelta(hours=sign * offset_hours, minutes=sign * offset_mins)
-    local_tz = timezone(local_offset)
-    local_time = ts.astimezone(local_tz)
-
-    # Parse work_start (HH:MM)
-    start_parts = work_start.split(":")
-    start_hour, start_min = int(start_parts[0]), int(start_parts[1])
-    cutoff = local_time.replace(
-        hour=start_hour, minute=start_min, second=0, microsecond=0
-    ) + timedelta(minutes=grace_minutes)
-
-    return local_time > cutoff
+    return is_late_arrival(
+        scan_timestamp=ensure_utc(first_in.timestamp),
+        work_start=work_start,
+        grace_minutes=grace_minutes,
+        timezone_offset=tz_offset,
+    )
 
 
 # ── RFID Scan (PUBLIC — kiosk does not require login) ───────────────
@@ -98,7 +82,18 @@ async def scan_card(
     Uses WRITE LOCKING (with_for_update) to prevent race conditions (double tap).
     Returns enriched response with today's hours, last event, and late status.
     """
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    att_settings: AttendanceSettings | None = None
+    tz_offset = "+05:00"
+    try:
+        settings_result = await db.execute(select(AttendanceSettings).limit(1))
+        att_settings = settings_result.scalar_one_or_none()
+        if att_settings and att_settings.timezone_offset:
+            tz_offset = att_settings.timezone_offset
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Unable to load attendance settings before scan: %s", exc)
+
+    now = utc_now()
+    today_str = business_date_str(tz_offset, now)
 
     # Find or auto-register employee
     result = await db.execute(select(Employee).where(Employee.rfid_uid == body.uid))
@@ -137,11 +132,9 @@ async def scan_card(
 
     # Anti-bounce check
     if last_event:
-        last_ts = last_event.timestamp
-        if last_ts.tzinfo is None:
-            last_ts = last_ts.replace(tzinfo=timezone.utc)
+        last_ts = ensure_utc(last_event.timestamp)
 
-        if (datetime.now(timezone.utc) - last_ts).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
+        if (utc_now() - last_ts).total_seconds() < settings.BOUNCE_WINDOW_SECONDS:
             return ScanResponse(
                 success=True,
                 event=last_event.event_type,
@@ -151,7 +144,6 @@ async def scan_card(
                 attendance_timestamp=last_event.timestamp.isoformat(),
             )
 
-    now = datetime.now(timezone.utc)
     attendance = Attendance(
         employee_id=employee.id,
         rfid_uid=body.uid,
@@ -183,8 +175,6 @@ async def scan_card(
     # Late check — read attendance settings
     is_late = False
     try:
-        settings_result = await db.execute(select(AttendanceSettings).limit(1))
-        att_settings = settings_result.scalar_one_or_none()
         if att_settings:
             is_late = _check_is_late(
                 all_today,
@@ -217,13 +207,22 @@ async def _record_break_event(uid: str, event_type: str, db: AsyncSession) -> Br
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    now = datetime.now(timezone.utc)
+    tz_offset = "+05:00"
+    try:
+        settings_result = await db.execute(select(AttendanceSettings).limit(1))
+        att_settings = settings_result.scalar_one_or_none()
+        if att_settings and att_settings.timezone_offset:
+            tz_offset = att_settings.timezone_offset
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Unable to load settings for break event: %s", exc)
+
+    now = utc_now()
     attendance = Attendance(
         employee_id=employee.id,
         rfid_uid=uid,
         event_type=event_type,
         timestamp=now,
-        date=now.strftime("%Y-%m-%d"),
+        date=business_date_str(tz_offset, now),
     )
     db.add(attendance)
     await db.commit()
@@ -259,9 +258,9 @@ async def break_end(
 # ── Employee CRUD ───────────────────────────────────────────────────
 @router.get("/employees", response_model=list[EmployeeRead])
 async def list_employees(
-    skip: int = 0,
-    limit: int = Query(default=50, le=500),
-    search: str | None = None,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=500),
+    search: str | None = Query(default=None, max_length=200),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_active_user),
 ) -> list[Employee]:

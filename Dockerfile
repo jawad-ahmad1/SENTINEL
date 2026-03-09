@@ -14,6 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
+COPY migrations/ migrations/
+COPY alembic.ini .
 COPY frontend/ frontend/
 # NOTE: .env is NOT copied into the image — secrets are injected via
 # docker-compose env_file at runtime. Never bake secrets into images.

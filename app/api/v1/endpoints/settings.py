@@ -8,8 +8,9 @@ PUT updates it. If no row exists, one is created with defaults on first GET.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,7 +63,20 @@ async def update_settings(
     """Update attendance rules (work start, end, grace period, timezone)."""
     settings = await _get_or_create_settings(db)
 
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    proposed_start = updates.get("work_start", settings.work_start)
+    proposed_end = updates.get("work_end", settings.work_end)
+
+    # Disallow invalid workday windows that break late/absence calculations.
+    start_time = datetime.strptime(proposed_start, "%H:%M").time()
+    end_time = datetime.strptime(proposed_end, "%H:%M").time()
+    if end_time <= start_time:
+        raise HTTPException(
+            status_code=422,
+            detail="work_end must be later than work_start in the same day",
+        )
+
+    for field, value in updates.items():
         setattr(settings, field, value)
 
     await db.commit()

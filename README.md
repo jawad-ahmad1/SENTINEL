@@ -110,7 +110,7 @@ That's it. Four containers start automatically:
 | 📋 Reports | http://localhost/reports.html |
 | 📖 API Docs (Swagger) | http://localhost/docs |
 
-Login with the credentials from `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` in your `.env`.
+Login with the credentials from `FIRST_ADMIN_EMAIL` / `FIRST_ADMIN_PASSWORD` in your `.env`.
 
 ### Windows Quick Start
 
@@ -132,7 +132,7 @@ All endpoints are prefixed with `/api/v1`. Interactive docs at `/docs`.
 ### Scanning & Breaks
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/scan` | User | RFID scan — auto-toggles IN/OUT |
+| POST | `/scan` | Public | RFID scan — auto-toggles IN/OUT |
 | POST | `/break/start` | User | Start break for employee |
 | POST | `/break/end` | User | End break for employee |
 
@@ -183,11 +183,12 @@ sentinel-attendance/
 │   └── main.py                   # FastAPI app factory + lifespan
 │
 ├── frontend/                     # Static frontend
-│   ├── css/style.css             # 1,075-line design system
+│   ├── css/main.css              # Shared design system
 │   ├── js/
 │   │   ├── script.js             # Kiosk logic + RFID capture
-│   │   ├── admin.js              # Admin dashboard logic
-│   │   └── reports.js            # Reports + CSV export
+│   │   ├── auth.js               # Auth/session helper
+│   │   ├── layout.js             # Shared admin layout renderer
+│   │   └── toast.js              # Toast notifications
 │   ├── index.html                # Kiosk scanning page
 │   ├── login.html                # Authentication page
 │   ├── admin.html                # Admin dashboard
@@ -197,7 +198,7 @@ sentinel-attendance/
 │
 ├── nginx/nginx.conf              # Reverse proxy + rate limiting config
 ├── migrations/                   # Alembic database migrations
-├── tests/                        # Async test suite (32 tests)
+├── tests/                        # Async test suite
 ├── scripts/
 │   ├── backup.sh                 # Automated PostgreSQL backup
 │   └── monitor.sh                # Health monitoring + alerting
@@ -275,8 +276,9 @@ sentinel-attendance/
 | `BOUNCE_WINDOW_SECONDS` | `2` | Anti-duplicate scan threshold |
 | `COOKIE_SECURE` | `false` | Set `true` for HTTPS |
 | `CORS_ORIGINS` | `["http://localhost"]` | Allowed origins (JSON array) |
-| `DEFAULT_ADMIN_EMAIL` | `admin@attendance.local` | Seeded admin account |
-| `DEFAULT_ADMIN_PASSWORD` | `changeme123` | Seeded admin password (**change this**) |
+| `FIRST_ADMIN_EMAIL` | `admin@attendance.local` | Seeded admin account |
+| `FIRST_ADMIN_PASSWORD` | `changeme123` | Seeded admin password (**change this**) |
+| `AUTO_CREATE_SCHEMA` | `false` | Keep schema creation migration-first in production |
 
 > ⚠️ Copy `.env.example` to `.env` and fill in production values. Never commit `.env` to git.
 
@@ -307,7 +309,7 @@ python -m pytest tests/ -v
 docker compose exec app python -m pytest tests/ -v
 ```
 
-**32 tests** across 7 test files:
+Tests are organized by endpoint domain and security behavior:
 
 | File | Tests | Coverage |
 |------|-------|----------|

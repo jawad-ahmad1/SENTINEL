@@ -16,7 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from app.core.config import settings
 from app.db.base import Base
 # Import models to ensure they are registered
-from app.models import user, employee 
+from app.models import absence_override, attendance_settings, employee, user  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

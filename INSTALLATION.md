@@ -87,7 +87,7 @@ curl http://localhost/api/v1/health
 | 📊 Dashboard | http://localhost/admin.html |
 | 📖 API Docs | http://localhost/docs |
 
-Login with `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` from your `.env`.
+Login with `FIRST_ADMIN_EMAIL` / `FIRST_ADMIN_PASSWORD` from your `.env`.
 
 ---
 

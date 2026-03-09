@@ -1,0 +1,169 @@
+﻿"occurrences","snippet","refs"
+"5","<link rel=""preconnect"" href=""https://fonts.googleapis.com"">
+<link rel=""preconnect"" href=""https://fonts.gstatic.com"" crossorigin>
+<link
+href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">","frontend/employees.html:10 | frontend/index.html:10 | frontend/register.html:10 | frontend/reports.html:10 | frontend/settings.html:10"
+"5","<link rel=""icon"" type=""image/png"" href=""/img/logo.png?v=3"">
+<link rel=""preconnect"" href=""https://fonts.googleapis.com"">
+<link rel=""preconnect"" href=""https://fonts.gstatic.com"" crossorigin>
+<link
+href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">","frontend/employees.html:9 | frontend/index.html:9 | frontend/register.html:9 | frontend/reports.html:9 | frontend/settings.html:9"
+"4","<link rel=""stylesheet"" href=""css/main.css?v=8"">
+</head>
+<body>
+<!-- Layout Containers -->
+<div id=""sidebar-container""></div>
+<main class=""main-content"">","frontend/admin.html:15 | frontend/employees.html:15 | frontend/register.html:15 | frontend/reports.html:15"
+"4","</head>
+<body>
+<!-- Layout Containers -->
+<div id=""sidebar-container""></div>
+<main class=""main-content"">
+<div id=""header-container""></div>","frontend/admin.html:16 | frontend/employees.html:16 | frontend/register.html:16 | frontend/reports.html:16"
+"4","rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">
+</head>
+<body>
+<!-- Layout Containers -->
+<div id=""sidebar-container""></div>","frontend/admin.html:14 | frontend/employees.html:14 | frontend/register.html:14 | frontend/reports.html:14"
+"3","<link rel=""preconnect"" href=""https://fonts.gstatic.com"" crossorigin>
+<link
+href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">
+</head>","frontend/employees.html:11 | frontend/register.html:11 | frontend/reports.html:11"
+"3","}
+to {
+opacity: 1;
+transform: translateY(0);
+}
+}","frontend/css/main.css:329 | frontend/css/main.css:758 | frontend/index.html:225"
+"3","href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">
+</head>
+<body>
+<!-- Layout Containers -->","frontend/employees.html:13 | frontend/register.html:13 | frontend/reports.html:13"
+"3","<link
+href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">
+</head>
+<body>","frontend/employees.html:12 | frontend/register.html:12 | frontend/reports.html:12"
+"2","<!-- Layout Containers -->
+<div id=""sidebar-container""></div>
+<main class=""main-content"">
+<div id=""header-container""></div>
+<div class=""card animate-enter"">
+<div class=""toolbar"">","frontend/employees.html:18 | frontend/reports.html:18"
+"2","try:
+settings_result = await db.execute(select(AttendanceSettings).limit(1))
+att_settings = settings_result.scalar_one_or_none()
+if att_settings and att_settings.timezone_offset:
+tz_offset = att_settings.timezone_offset
+except Exception as exc:  # noqa: BLE001","app/api/v1/endpoints/employees.py:71 | app/api/v1/endpoints/employees.py:170"
+"2","</tr>
+</tbody>
+</table>
+</div>
+</main>
+<script src=""js/auth.js""></script>","frontend/admin.html:152 | frontend/reports.html:43"
+"2","Column,
+DateTime,
+ForeignKey,
+Index,
+Integer,
+String,","app/models/absence_override.py:10 | app/models/employee.py:9"
+"2","<link rel=""preconnect"" href=""https://fonts.gstatic.com"" crossorigin>
+<link
+href=""https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap""
+rel=""stylesheet"" media=""print"" onload=""this.media='all'"">
+<link rel=""stylesheet"" href=""css/main.css?v=8"">
+<style>","frontend/index.html:11 | frontend/settings.html:11"
+"2","});
+const API_BASE = window.location.origin && window.location.protocol !== 'file:' ? window.location.origin : 'http://127.0.0.1:8000';
+(async () => {
+const user = await AUTH.requireAdmin();
+if (!user) return;
+AUTH.initInactivityTimeout();","frontend/employees.html:75 | frontend/register.html:73"
+"2","select(Attendance, Employee.name)
+.join(Employee, Attendance.employee_id == Employee.id)
+.where(Attendance.date == date_str)
+.order_by(Attendance.employee_id, Attendance.timestamp.asc())
+)
+rows = result.all()","app/api/v1/endpoints/reports.py:146 | app/api/v1/endpoints/reports.py:187"
+"2","result = await db.execute(
+select(Attendance, Employee.name)
+.join(Employee, Attendance.employee_id == Employee.id)
+.where(Attendance.date == date_str)
+.order_by(Attendance.employee_id, Attendance.timestamp.asc())
+)","app/api/v1/endpoints/reports.py:145 | app/api/v1/endpoints/reports.py:186"
+"2","opacity: 0;
+transform: translateY(20px);
+}
+to {
+opacity: 1;
+transform: translateY(0);","frontend/css/main.css:756 | frontend/index.html:223"
+"2","const res = await fetch(`${this.API_BASE}/api/v1/auth/me`, {
+credentials: 'include'
+});
+if (!res.ok) throw new Error('Not authenticated');
+const user = await res.json();
+localStorage.setItem(this.LOGGED_IN_KEY, 'true');","frontend/js/auth.js:71 | frontend/js/auth.js:90"
+"2","date_str = _validate_date_input(date_str)
+result = await db.execute(
+select(Attendance, Employee.name)
+.join(Employee, Attendance.employee_id == Employee.id)
+.where(Attendance.date == date_str)
+.order_by(Attendance.employee_id, Attendance.timestamp.asc())","app/api/v1/endpoints/reports.py:144 | app/api/v1/endpoints/reports.py:185"
+"2","try {
+const res = await fetch(`${this.API_BASE}/api/v1/auth/me`, {
+credentials: 'include'
+});
+if (!res.ok) throw new Error('Not authenticated');
+const user = await res.json();","frontend/js/auth.js:70 | frontend/js/auth.js:89"
+"2","</div>
+</main>
+<script src=""js/auth.js""></script>
+<script src=""js/layout.js?v=7""></script>
+<script src=""js/toast.js""></script>
+<script>","frontend/register.html:63 | frontend/reports.html:46"
+"2","CheckConstraint,
+Column,
+DateTime,
+ForeignKey,
+Index,
+Integer,","app/models/absence_override.py:9 | app/models/employee.py:8"
+"2","from {
+opacity: 0;
+transform: translateY(20px);
+}
+to {
+opacity: 1;","frontend/css/main.css:755 | frontend/index.html:222"
+"2","transform: translateY(20px);
+}
+to {
+opacity: 1;
+transform: translateY(0);
+}","frontend/css/main.css:757 | frontend/index.html:224"
+"2","credentials: 'include'
+});
+if (!res.ok) throw new Error('Not authenticated');
+const user = await res.json();
+localStorage.setItem(this.LOGGED_IN_KEY, 'true');
+if (user.role) localStorage.setItem(this.USER_ROLE_KEY, user.role);","frontend/js/auth.js:72 | frontend/js/auth.js:91"
+"2","tz_offset = ""+05:00""
+try:
+settings_result = await db.execute(select(AttendanceSettings).limit(1))
+att_settings = settings_result.scalar_one_or_none()
+if att_settings and att_settings.timezone_offset:
+tz_offset = att_settings.timezone_offset","app/api/v1/endpoints/employees.py:70 | app/api/v1/endpoints/employees.py:169"
+"2","<body>
+<!-- Layout Containers -->
+<div id=""sidebar-container""></div>
+<main class=""main-content"">
+<div id=""header-container""></div>
+<div class=""card animate-enter"">","frontend/employees.html:17 | frontend/reports.html:17"

@@ -1,4 +1,4 @@
-# Issues And Fixes (Prioritized)
+﻿# Issues And Fixes (Prioritized)
 
 Date: 2026-03-09  
 Status legend: `Fixed`, `Open`, `Blocked-by-environment`
@@ -195,7 +195,7 @@ if end_time <= start_time:
 - Category: Input Validation
 - Location: `app/schemas/attendance.py`, `app/api/v1/endpoints/reports.py`
 - Fixes:
-  - strict `HH:MM` and `±HH:MM` regex validation
+  - strict `HH:MM` and `Â±HH:MM` regex validation
   - strict date parsing and month format checks
   - date range ordering checks
 
@@ -248,7 +248,7 @@ if len(password) < 10 or not any(c.isalpha() for c in password) or not any(c.isd
 ### Issue 16 - Reverse-usage mapping is heuristic (`Open`)
 - Severity: `LOW`
 - Category: Reporting Accuracy
-- Location: `biopsy_inventory.csv` generation approach
+- Location: `artifacts/file-inventory.csv` generation approach
 - Impact: possible false positives/negatives in `UsedBy` references.
 - Recommendation: switch to AST/linker-based dependency graph in future tooling.
 
@@ -268,3 +268,5 @@ if len(password) < 10 or not any(c.isalpha() for c in password) or not any(c.isd
 1. Reduce frontend inline-script/template complexity.
 2. Improve inventory tooling from heuristic references to parser-backed graph.
 3. Additional performance profiling and caching review under production-like load.
+
+

@@ -260,6 +260,30 @@ sentinel-attendance/
 | **[Roadmap](ROADMAP.md)** | Planned features |
 | **[Contributing](CONTRIBUTING.md)** | How to contribute |
 | **[Support](SUPPORT.md)** | How to get help |
+| **[Audit Reports](docs/audit/README.md)** | Security, quality, remediation, and metrics reports |
+
+---
+
+## Audit & Quality Reports
+
+All engineering audit outputs are organized under `docs/audit/` using lowercase kebab-case filenames.
+
+- [Executive Summary](docs/audit/executive-summary.md)
+- [Full Audit Report](docs/audit/full-audit-report.md)
+- [Remediation Log](docs/audit/remediation-log.md)
+- [Validation Test Plan](docs/audit/validation-test-plan.md)
+- [Metrics Dashboard](docs/audit/metrics-dashboard.md)
+- [Technical Debt Register](docs/audit/technical-debt-register.md)
+- [Audit Artifacts](docs/audit/artifacts/)
+
+---
+
+## Repository Conventions
+
+- Keep human documentation in Markdown under `docs/` or root-level canonical guides.
+- Use lowercase kebab-case for newly added report and artifact filenames.
+- Avoid root-level ad-hoc analysis dumps and temporary scripts; keep utilities in `scripts/`.
+- Keep generated runtime artifacts out of git via `.gitignore`.
 
 ---
 

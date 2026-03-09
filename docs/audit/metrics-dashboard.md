@@ -1,7 +1,7 @@
-# Metrics Dashboard
+﻿# Metrics Dashboard
 
 Date: 2026-03-09  
-Source artifacts: `biopsy_manifest.csv`, `biopsy_inventory.csv`, `biopsy_metrics.json`, `biopsy_complexity.csv`, `biopsy_duplicates.csv`
+Source artifacts: `artifacts/file-manifest.csv`, `artifacts/file-inventory.csv`, `artifacts/metrics.json`, `artifacts/complexity-analysis.csv`, `artifacts/duplication-analysis.csv`
 
 ## 1) Size Metrics
 | Metric | Value |
@@ -91,8 +91,8 @@ Top complexity hotspots:
 Normalized overall: **85/100**
 
 ## 9) Chart Definitions (for external dashboarding)
-1. `loc_by_extension` - bar chart from `biopsy_manifest.csv` grouped by extension.
-2. `complexity_distribution` - histogram from `biopsy_complexity.csv` by `CyclomaticProxy`.
+1. `loc_by_extension` - bar chart from `artifacts/file-manifest.csv` grouped by extension.
+2. `complexity_distribution` - histogram from `artifacts/complexity-analysis.csv` by `CyclomaticProxy`.
 3. `top_complex_functions` - horizontal bar for top 10 `CyclomaticProxy`.
 4. `duplication_windows` - pie chart split by boilerplate vs non-boilerplate duplicate windows.
 5. `issue_severity` - stacked bar: critical/high/medium/low open vs fixed.
@@ -104,3 +104,5 @@ Normalized overall: **85/100**
   - executing full integration tests,
   - resolving scan endpoint trust boundary,
   - reducing complexity in report endpoints.
+
+

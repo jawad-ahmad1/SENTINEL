@@ -1,4 +1,4 @@
-# Technical Debt Register
+﻿# Technical Debt Register
 
 Date: 2026-03-09
 
@@ -116,3 +116,5 @@ Date: 2026-03-09
 | TD-03 | 3-5d | High | High |
 | TD-05 | 0.5-1d | High | High |
 | TD-06 | 2-4d | High | High |
+
+

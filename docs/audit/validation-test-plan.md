@@ -1,4 +1,4 @@
-# Test Plan
+﻿# Test Plan
 
 Date: 2026-03-09  
 Project: RFID Attendance System
@@ -137,3 +137,5 @@ Targets:
 
 Action required:
 - Restore runtime prerequisites, then execute this plan exactly and attach logs to release notes.
+
+

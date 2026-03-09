@@ -1,4 +1,4 @@
-# COMPLETE BIOPSY REPORT
+﻿# Complete Audit Report
 
 Date: 2026-03-09  
 Project: RFID Attendance System  
@@ -39,8 +39,8 @@ Workspace: `d:\attendance_system`
 
 ### 2.3 Complete File Map
 - Full per-file map (path, LOC, purpose, dependencies, reverse references, last modified) is generated in:
-  - `biopsy_inventory.csv`
-  - `biopsy_manifest.csv`
+  - `artifacts/file-inventory.csv`
+  - `artifacts/file-manifest.csv`
 
 ## 3) Code Quality Deep Dive
 
@@ -65,13 +65,13 @@ Workspace: `d:\attendance_system`
   - `absence_report` in `app/api/v1/endpoints/reports.py`
   - `live_stats` in `app/api/v1/endpoints/reports.py`
   - `scan_card` in `app/api/v1/endpoints/employees.py`
-- Complexity artifact: `biopsy_complexity.csv`.
+- Complexity artifact: `artifacts/complexity-analysis.csv`.
 
 ### 3.4 Duplication
 - Approximate duplicate 6-line windows: `28`
 - Approximate duplicate lines: `432` (includes intentional shared frontend boilerplate).
 - Largest duplicates are static HTML head/layout fragments across frontend pages.
-- Duplication artifact: `biopsy_duplicates.csv`.
+- Duplication artifact: `artifacts/duplication-analysis.csv`.
 
 ### 3.5 Error Handling
 - Improved:
@@ -246,28 +246,28 @@ Production readiness: **Conditional**
 | $path | 0 | Project artifact / documentation / script | 2026-02-12T14:04:13Z |  |  |
 | $path | 0 | Project artifact / documentation / script | 2026-02-12T14:04:16Z |  |  |
 | $path | 14 | Project artifact / documentation / script | 2026-02-24T10:03:07Z | from fastapi import APIRouter; from app.api.v1.endpoints import auth, employees, reports, settings |  |
-| $path | 105 | Project artifact / documentation / script | 2026-03-09T06:32:30Z | from __future__ import annotations; from collections.abc import AsyncGenerator; from typing import Optional; from urllib… |  |
+| $path | 105 | Project artifact / documentation / script | 2026-03-09T06:32:30Z | from __future__ import annotations; from collections.abc import AsyncGenerator; from typing import Optional; from urllibâ€¦ |  |
 | $path | 0 | Project artifact / documentation / script | 2026-02-12T14:04:24Z |  |  |
-| $path | 160 | Authentication and user management endpoints | 2026-03-09T06:17:45Z | from __future__ import annotations; from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, st… |  |
-| $path | 304 | RFID scan, breaks, and employee CRUD endpoints | 2026-03-09T06:44:53Z | from __future__ import annotations; import logging; from datetime import datetime; from fastapi import APIRouter, Depend… |  |
-| $path | 934 | Reporting/analytics/export and absence endpoints | 2026-03-09T06:44:45Z | from __future__ import annotations; import calendar; import csv; import io; import json; import logging; from collection… |  |
-| $path | 69 | Attendance settings endpoints | 2026-03-09T06:18:02Z | from __future__ import annotations; import logging; from datetime import datetime; from fastapi import APIRouter, Depend… |  |
+| $path | 160 | Authentication and user management endpoints | 2026-03-09T06:17:45Z | from __future__ import annotations; from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, stâ€¦ |  |
+| $path | 304 | RFID scan, breaks, and employee CRUD endpoints | 2026-03-09T06:44:53Z | from __future__ import annotations; import logging; from datetime import datetime; from fastapi import APIRouter, Dependâ€¦ |  |
+| $path | 934 | Reporting/analytics/export and absence endpoints | 2026-03-09T06:44:45Z | from __future__ import annotations; import calendar; import csv; import io; import json; import logging; from collectionâ€¦ |  |
+| $path | 69 | Attendance settings endpoints | 2026-03-09T06:18:02Z | from __future__ import annotations; import logging; from datetime import datetime; from fastapi import APIRouter, Dependâ€¦ |  |
 | $path | 0 | Project artifact / documentation / script | 2026-02-12T14:02:25Z |  |  |
-| $path | 87 | Environment and runtime configuration | 2026-03-09T06:19:26Z | from __future__ import annotations; import json; import logging; from pydantic import field_validator, model_validator; … |  |
-| $path | 38 | Project artifact / documentation / script | 2026-02-25T05:26:14Z | from __future__ import annotations; import logging; from fastapi import FastAPI, HTTPException, Request; from fastapi.re… |  |
-| $path | 55 | JWT and password hashing utilities | 2026-02-25T05:26:14Z | from __future__ import annotations; from datetime import datetime, timedelta, timezone; from typing import Any; from jos… |  |
+| $path | 87 | Environment and runtime configuration | 2026-03-09T06:19:26Z | from __future__ import annotations; import json; import logging; from pydantic import field_validator, model_validator; â€¦ |  |
+| $path | 38 | Project artifact / documentation / script | 2026-02-25T05:26:14Z | from __future__ import annotations; import logging; from fastapi import FastAPI, HTTPException, Request; from fastapi.reâ€¦ |  |
+| $path | 55 | JWT and password hashing utilities | 2026-02-25T05:26:14Z | from __future__ import annotations; from datetime import datetime, timedelta, timezone; from typing import Any; from josâ€¦ |  |
 | $path | 49 | Timezone-aware date/time helpers | 2026-03-09T06:19:04Z | from __future__ import annotations; import re; from datetime import date, datetime, timedelta, timezone |  |
 | $path | 0 | Database base/session wiring | 2026-02-12T14:02:57Z |  |  |
 | $path | 4 | Database base/session wiring | 2026-02-25T05:34:10Z | from sqlalchemy.orm import DeclarativeBase |  |
-| $path | 35 | Database base/session wiring | 2026-02-25T05:26:14Z | from __future__ import annotations; from collections.abc import AsyncGenerator; from sqlalchemy.ext.asyncio import Async… |  |
-| $path | 114 | FastAPI app factory and startup lifecycle | 2026-03-09T06:17:09Z | from __future__ import annotations; import logging; from contextlib import asynccontextmanager; from pathlib import Path… |  |
+| $path | 35 | Database base/session wiring | 2026-02-25T05:26:14Z | from __future__ import annotations; from collections.abc import AsyncGenerator; from sqlalchemy.ext.asyncio import Asyncâ€¦ |  |
+| $path | 114 | FastAPI app factory and startup lifecycle | 2026-03-09T06:17:09Z | from __future__ import annotations; import logging; from contextlib import asynccontextmanager; from pathlib import Pathâ€¦ |  |
 | $path | 0 | ORM models | 2026-02-12T14:03:08Z |  |  |
-| $path | 40 | ORM models | 2026-03-09T06:18:28Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import (; from app.db.base … |  |
-| $path | 24 | ORM models | 2026-02-24T12:21:45Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import Column, DateTime, In… |  |
-| $path | 58 | ORM models | 2026-03-09T06:18:15Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import (; from sqlalchemy.o… |  |
-| $path | 24 | ORM models | 2026-02-12T14:03:16Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import Boolean, Column, Dat… |  |
+| $path | 40 | ORM models | 2026-03-09T06:18:28Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import (; from app.db.base â€¦ |  |
+| $path | 24 | ORM models | 2026-02-24T12:21:45Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import Column, DateTime, Inâ€¦ |  |
+| $path | 58 | ORM models | 2026-03-09T06:18:15Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import (; from sqlalchemy.oâ€¦ |  |
+| $path | 24 | ORM models | 2026-02-12T14:03:16Z | from __future__ import annotations; from datetime import datetime, timezone; from sqlalchemy import Boolean, Column, Datâ€¦ |  |
 | $path | 0 | Pydantic request/response schemas | 2026-02-12T14:03:41Z |  |  |
-| $path | 303 | Pydantic request/response schemas | 2026-03-09T06:16:10Z | from __future__ import annotations; import re; from datetime import datetime; from pydantic import BaseModel, Field, fie… |  |
+| $path | 303 | Pydantic request/response schemas | 2026-03-09T06:16:10Z | from __future__ import annotations; import re; from datetime import datetime; from pydantic import BaseModel, Field, fieâ€¦ |  |
 | $path | 12 | Pydantic request/response schemas | 2026-02-12T14:03:46Z | from __future__ import annotations; from pydantic import BaseModel |  |
 | $path | 61 | Pydantic request/response schemas | 2026-03-09T06:16:32Z | from __future__ import annotations; from datetime import datetime; from pydantic import BaseModel, field_validator |  |
 | $path | 213 | Project artifact / documentation / script | 2026-02-25T06:04:42Z |  |  |
@@ -290,23 +290,23 @@ Production readiness: **Conditional**
 | $path | n/a | Project artifact / documentation / script | 2026-02-25T07:58:09Z |  |  |
 | $path | 77 | Project artifact / documentation / script | 2026-02-25T06:07:33Z |  |  |
 | $path | 162 | Project artifact / documentation / script | 2026-02-24T13:08:02Z |  |  |
-| $path | 342 | Admin dashboard and maintenance actions | 2026-02-25T05:20:06Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
+| $path | 342 | Admin dashboard and maintenance actions | 2026-02-25T05:20:06Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
 | $path | 980 | Shared styling for admin/kiosk pages | 2026-02-25T05:16:05Z |  |  |
-| $path | 179 | Employee management UI | 2026-02-25T05:20:09Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
+| $path | 179 | Employee management UI | 2026-02-25T05:20:09Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
 | $path | n/a | Project artifact / documentation / script | 2026-02-14T13:30:25Z |  |  |
-| $path | 574 | Public kiosk RFID scan interface | 2026-03-09T06:23:41Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
+| $path | 574 | Public kiosk RFID scan interface | 2026-03-09T06:23:41Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
 | $path | 152 | Frontend auth/session helper | 2026-03-09T06:23:30Z |  |  |
 | $path | 102 | Shared layout/sidebar/header renderer | 2026-03-09T06:22:56Z |  |  |
 | $path | 349 | Kiosk interaction logic | 2026-02-24T11:38:13Z |  |  |
 | $path | 101 | Toast notifications | 2026-03-09T06:22:33Z |  |  |
-| $path | 319 | Admin login page | 2026-03-09T06:23:17Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link href=; <link … |  |
-| $path | 163 | Employee registration UI | 2026-03-09T06:22:41Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
-| $path | 530 | Reports and analytics UI | 2026-03-09T06:52:36Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
-| $path | 323 | Attendance rules/settings UI | 2026-03-09T06:23:08Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="styleshe… |  |
+| $path | 319 | Admin login page | 2026-03-09T06:23:17Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link href=; <link â€¦ |  |
+| $path | 163 | Employee registration UI | 2026-03-09T06:22:41Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
+| $path | 530 | Reports and analytics UI | 2026-03-09T06:52:36Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
+| $path | 323 | Attendance rules/settings UI | 2026-03-09T06:23:08Z | <link rel="icon" type="image/png" href=; <link rel="preconnect" href=; <link rel="preconnect" href=; <link rel="stylesheâ€¦ |  |
 | $path | 370 | Project artifact / documentation / script | 2026-02-21T11:23:36Z |  |  |
 | $path | 198 | Installation guide | 2026-03-09T06:31:23Z |  |  |
 | $path | n/a | Project artifact / documentation / script | 2026-02-21T11:27:51Z |  | CHANGELOG.md; FAQ.md; README.md; USER_GUIDE.md |
-| $path | 65 | Alembic migration environment config | 2026-03-09T06:25:20Z | import asyncio; from logging.config import fileConfig; from sqlalchemy import pool; from sqlalchemy.engine import Connec… |  |
+| $path | 65 | Alembic migration environment config | 2026-03-09T06:25:20Z | import asyncio; from logging.config import fileConfig; from sqlalchemy import pool; from sqlalchemy.engine import Connecâ€¦ |  |
 | $path | 18 | Project artifact / documentation / script | 2026-02-12T14:26:53Z |  |  |
 | $path | n/a | Project artifact / documentation / script | 2026-02-12T16:21:52Z |  |  |
 | $path | 139 | Alembic migration revision | 2026-03-09T06:26:05Z | from __future__ import annotations; from alembic import op; import sqlalchemy as sa |  |
@@ -320,19 +320,21 @@ Production readiness: **Conditional**
 | $path | 28 | Project artifact / documentation / script | 2026-02-21T11:15:03Z |  |  |
 | $path | 38 | Project artifact / documentation / script | 2026-02-21T11:15:05Z |  |  |
 | $path | 70 | Project artifact / documentation / script | 2026-03-09T05:52:45Z |  |  |
-| $path | 18 | Project artifact / documentation / script | 2026-02-25T07:52:00Z | import asyncio; from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker; from sqlalchemy import selec… |  |
+| $path | 18 | Project artifact / documentation / script | 2026-02-25T07:52:00Z | import asyncio; from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker; from sqlalchemy import selecâ€¦ |  |
 | $path | 17 | Project artifact / documentation / script | 2026-02-25T07:55:12Z | import urllib.request; import json |  |
 | $path | 35 | Project artifact / documentation / script | 2026-02-25T06:08:16Z |  |  |
 | $path | 156 | Project artifact / documentation / script | 2026-02-25T06:05:13Z |  |  |
-| $path | 81 | Automated tests | 2026-02-25T05:26:21Z | import asyncio; import os; import sys; from typing import AsyncGenerator; import pytest; from httpx import ASGITransport… |  |
+| $path | 81 | Automated tests | 2026-02-25T05:26:21Z | import asyncio; import os; import sys; from typing import AsyncGenerator; import pytest; from httpx import ASGITransportâ€¦ |  |
 | $path | 73 | Automated tests | 2026-02-25T05:26:14Z | import asyncio; import random; import string; import sys  # noqa: F401; import time; import httpx; import traceback |  |
-| $path | 35 | Automated tests | 2026-02-25T05:06:01Z | import asyncio; import os; import sys; import random  # noqa: F401; import string  # noqa: F401; from sqlalchemy import … |  |
+| $path | 35 | Automated tests | 2026-02-25T05:06:01Z | import asyncio; import os; import sys; import random  # noqa: F401; import string  # noqa: F401; from sqlalchemy import â€¦ |  |
 | $path | 42 | Automated tests | 2026-02-25T05:26:14Z | import pytest; from httpx import AsyncClient |  |
 | $path | 93 | Automated tests | 2026-02-25T05:26:14Z | import pytest; from httpx import AsyncClient |  |
 | $path | 63 | Automated tests | 2026-02-25T05:26:14Z | import asyncio  # noqa: F401; import random; import string; import pytest; from httpx import AsyncClient |  |
-| $path | 119 | Automated tests | 2026-03-09T06:29:59Z | from datetime import datetime, timezone; import pytest; from httpx import AsyncClient; from unittest.mock import patch; … |  |
-| $path | 91 | Automated tests | 2026-03-09T06:29:47Z | from datetime import datetime, timezone; import pytest; from httpx import AsyncClient; from sqlalchemy import select; fr… |  |
-| $path | 95 | Automated tests | 2026-02-25T05:26:14Z | import asyncio  # noqa: F401 — used by event_loop fixture; import pytest; from httpx import AsyncClient; from sqlalchemy… |  |
+| $path | 119 | Automated tests | 2026-03-09T06:29:59Z | from datetime import datetime, timezone; import pytest; from httpx import AsyncClient; from unittest.mock import patch; â€¦ |  |
+| $path | 91 | Automated tests | 2026-03-09T06:29:47Z | from datetime import datetime, timezone; import pytest; from httpx import AsyncClient; from sqlalchemy import select; frâ€¦ |  |
+| $path | 95 | Automated tests | 2026-02-25T05:26:14Z | import asyncio  # noqa: F401 â€” used by event_loop fixture; import pytest; from httpx import AsyncClient; from sqlalchemyâ€¦ |  |
 | $path | 43 | Automated tests | 2026-03-09T06:29:23Z | import pytest; from httpx import AsyncClient |  |
 | $path | 190 | Troubleshooting guide | 2026-03-09T06:31:35Z |  |  |
 | $path | 431 | Project artifact / documentation / script | 2026-02-12T17:44:07Z |  |  |
+
+

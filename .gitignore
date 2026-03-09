@@ -51,3 +51,9 @@ logs/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local analysis artifacts (root-level ad hoc files)
+biopsy_*
+seed.py
+seed_api.py
+
